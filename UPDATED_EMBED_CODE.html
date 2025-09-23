@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PinkWizard Embed with Auth</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .embed-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        iframe {
+            width: 100%;
+            height: 800px;
+            border: none;
+        }
+        button {
+            background: #e91e63;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #c2185b;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .auth-section {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>75 Hard Challenge - PinkWizard Integration with Auth</h1>
+        
+        <div class="controls">
+            <h3>Outreach Data Controls</h3>
+            <button onclick="sendMockData()">Send Day 15 Data</button>
+            <button onclick="sendDifferentDay()">Send Day 30 Data</button>
+            <button onclick="sendZeroData()">Send Zero Data</button>
+            
+            <div class="auth-section">
+                <h4>Authentication</h4>
+                <input type="email" id="email" placeholder="Email" value="hello@mobilebevpros.com">
+                <input type="password" id="password" placeholder="Password">
+                <button onclick="sendAuth()">Send Auth to Embed</button>
+            </div>
+            
+            <div class="status" id="status">Ready to send data...</div>
+        </div>
+
+        <div class="embed-container">
+            <iframe 
+                id="pinkwizard-iframe"
+                src="https://warm-reach-wiz.lovable.app"
+                title="PinkWizard Outreach Tracker">
+            </iframe>
+        </div>
+    </div>
+
+    <script>
+        let iframe;
+        
+        window.addEventListener('DOMContentLoaded', function() {
+            iframe = document.getElementById('pinkwizard-iframe');
+            
+            // Listen for messages from the iframe
+            window.addEventListener('message', function(event) {
+                console.log('Received message from iframe:', event.data);
+                
+                if (event.data?.type === 'REQUEST_PINKWIZARD_OUTREACH_COUNTS') {
+                    console.log('Child app requesting outreach counts');
+                    updateStatus('Child app requested outreach counts');
+                    sendCurrentData();
+                }
+                
+                if (event.data?.type === 'REQUEST_PINKWIZARD_AUTH') {
+                    console.log('Child app requesting auth');
+                    updateStatus('Child app requested authentication');
+                    // Auto-send auth if email is filled
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    if (email && password) {
+                        sendAuthCredentials(email, password);
+                    }
+                }
+                
+                if (event.data?.type === 'PINKWIZARD_AUTH_RESULT') {
+                    if (event.data.success) {
+                        updateStatus(`Authentication successful for: ${event.data.user}`);
+                    } else {
+                        updateStatus(`Authentication failed: ${event.data.error}`);
+                    }
+                }
+            });
+        });
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = new Date().toLocaleTimeString() + ': ' + message;
+        }
+
+        function sendCurrentData() {
+            const currentData = {
+                day: 15,
+                coldOutreach: 8,
+                nurturingOutreach: 12,
+                totalOutreach: 20,
+                lastUpdated: new Date().toISOString()
+            };
+            
+            sendDataToIframe(currentData);
+        }
+
+        function sendMockData() {
+            const mockData = {
+                day: 15,
+                coldOutreach: 8,
+                nurturingOutreach: 12,
+                totalOutreach: 20,
+                lastUpdated: new Date().toISOString()
+            };
+            
+            sendDataToIframe(mockData);
+            updateStatus('Sent Day 15 mock data');
+        }
+
+        function sendDifferentDay() {
+            const mockData = {
+                day: 30,
+                coldOutreach: 15,
+                nurturingOutreach: 18,
+                totalOutreach: 33,
+                lastUpdated: new Date().toISOString()
+            };
+            
+            sendDataToIframe(mockData);
+            updateStatus('Sent Day 30 mock data');
+        }
+
+        function sendZeroData() {
+            const mockData = {
+                day: 1,
+                coldOutreach: 0,
+                nurturingOutreach: 0,
+                totalOutreach: 0,
+                lastUpdated: new Date().toISOString()
+            };
+            
+            sendDataToIframe(mockData);
+            updateStatus('Sent zero data');
+        }
+
+        function sendAuth() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                updateStatus('Error: Please enter both email and password');
+                return;
+            }
+            
+            sendAuthCredentials(email, password);
+        }
+
+        function sendAuthCredentials(email, password) {
+            if (iframe && iframe.contentWindow) {
+                const message = {
+                    type: 'PINKWIZARD_AUTH_TOKEN',
+                    payload: { email, password }
+                };
+                
+                console.log('Sending auth to iframe:', { email, password: '***' });
+                iframe.contentWindow.postMessage(message, '*');
+                updateStatus(`Sent authentication for: ${email}`);
+            } else {
+                updateStatus('Error: Iframe not ready');
+            }
+        }
+
+        function sendDataToIframe(data) {
+            if (iframe && iframe.contentWindow) {
+                const message = {
+                    type: 'PINKWIZARD_OUTREACH_COUNTS',
+                    payload: data
+                };
+                
+                console.log('Sending to iframe:', message);
+                iframe.contentWindow.postMessage(message, '*');
+            } else {
+                console.error('Iframe not ready');
+                updateStatus('Error: Iframe not ready');
+            }
+        }
+
+        // Auto-send data and auth when iframe loads
+        setTimeout(function() {
+            sendCurrentData();
+            // Auto-send auth if credentials are filled
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (email && password) {
+                sendAuthCredentials(email, password);
+            }
+            updateStatus('Auto-sent initial data and auth');
+        }, 3000);
+    </script>
+</body>
+</html>

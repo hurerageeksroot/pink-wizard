@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Iframe Test - Simple</title>
+    <style>
+        body { margin: 20px; font-family: Arial, sans-serif; }
+        iframe { width: 100%; height: 600px; border: 1px solid #ccc; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Simple Iframe Test</h1>
+    <div class="debug">
+        <strong>Direct link:</strong> <a href="https://warm-reach-wiz.lovable.app" target="_blank">Open PinkWizard directly</a>
+    </div>
+    
+    <div class="debug">
+        <strong>Embedded version:</strong>
+    </div>
+    
+    <iframe 
+        src="https://warm-reach-wiz.lovable.app" 
+        title="PinkWizard Test">
+    </iframe>
+
+    <script>
+        // Listen for messages from iframe
+        window.addEventListener('message', function(event) {
+            console.log('Parent received message:', event.data);
+        });
+        
+        // Send a test message after 2 seconds
+        setTimeout(function() {
+            const iframe = document.querySelector('iframe');
+            if (iframe && iframe.contentWindow) {
+                console.log('Sending test message to iframe');
+                iframe.contentWindow.postMessage({
+                    type: 'PINKWIZARD_OUTREACH_COUNTS',
+                    payload: {
+                        day: 10,
+                        coldOutreach: 5,
+                        nurturingOutreach: 7,
+                        totalOutreach: 12,
+                        lastUpdated: new Date().toISOString()
+                    }
+                }, '*');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

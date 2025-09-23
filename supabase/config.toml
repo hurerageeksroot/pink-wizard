@@ -1,0 +1,37 @@
+project_id = "idwkrddbdyakmpshsvtd"
+
+[auth]
+enabled = true
+
+[functions.seed-sample-data]
+verify_jwt = true
+
+[functions.start-trial]
+verify_jwt = true
+
+[functions.check-access]
+verify_jwt = true
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.check-subscription]
+verify_jwt = true
+
+[functions.customer-portal]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.fix-challenge-user-data]
+verify_jwt = true
+
+[functions.enroll-challenge-participant]
+verify_jwt = true
+
+[functions.integrations-inbound]
+verify_jwt = false
+
+[functions.integrations-outbound]
+verify_jwt = false
