@@ -14,6 +14,18 @@ interface ContactLike {
 /**
  * Determines if a contact is a demo/test contact that should be excluded from follow-up emails
  * Prioritizes server-side is_demo flag, falls back to client-side detection
+ * 
+ * IMPORTANT: We do NOT check the 'notes' field for demo indicators.
+ * 
+ * Reason: Notes are user-generated content where business terms like "demo", 
+ * "test", "sample", "example" naturally appear in legitimate contexts:
+ * - "Met with client to demo our product"
+ * - "They want to test the platform"
+ * - "This is an example of their previous work"
+ * 
+ * Checking notes causes too many false positives. Instead, we rely on
+ * email, source, company, and name fields which are more reliable indicators
+ * of actual demo/test contacts.
  */
 export const isDemoContact = (contact: ContactLike): boolean => {
   if (!contact) return false;
@@ -26,7 +38,6 @@ export const isDemoContact = (contact: ContactLike): boolean => {
   // Fallback to client-side detection for backwards compatibility
   const email = contact.email?.toLowerCase() || '';
   const source = contact.source?.toLowerCase() || '';
-  const notes = contact.notes?.toLowerCase() || '';
   const company = contact.company?.toLowerCase() || '';
   const name = contact.name?.toLowerCase() || '';
 
@@ -60,21 +71,8 @@ export const isDemoContact = (contact: ContactLike): boolean => {
 
   const hasSourceDemo = sourceDemoIndicators.some(indicator => source.includes(indicator));
 
-  // Check for demo indicators in notes
-  const notesDemoIndicators = [
-    'demo',
-    'test',
-    'sample',
-    'example',
-    'fake',
-    'generated'
-  ];
-
-  const hasNotesDemo = notesDemoIndicators.some(indicator => notes.includes(indicator));
-
-  // Check for demo indicators in company
+  // Check for demo indicators in company (slightly relaxed - removed 'demo' since "Demo Day" is legitimate)
   const companyDemoIndicators = [
-    'demo',
     'test',
     'sample',
     'example',
@@ -94,7 +92,7 @@ export const isDemoContact = (contact: ContactLike): boolean => {
 
   const hasNameDemo = nameDemoIndicators.some(indicator => name.includes(indicator));
 
-  return hasEmailDemo || hasSourceDemo || hasNotesDemo || hasCompanyDemo || hasNameDemo;
+  return hasEmailDemo || hasSourceDemo || hasCompanyDemo || hasNameDemo;
 };
 
 /**

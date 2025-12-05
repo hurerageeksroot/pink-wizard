@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,17 +83,49 @@ serve(async (req) => {
       });
     }
 
-    // Parse request body
-    const body = await req.json();
-    const contactData: ContactData = body;
+    // Define comprehensive validation schema
+    const ContactDataSchema = z.object({
+      email: z.string().email().max(255),
+      name: z.string().max(200).optional(),
+      company: z.string().max(200).optional(),
+      position: z.string().max(200).optional(),
+      phone: z.string().max(30).optional(),
+      address: z.string().max(500).optional(),
+      city: z.string().max(100).optional(),
+      state: z.string().max(100).optional(),
+      zip_code: z.string().max(20).optional(),
+      country: z.string().max(100).optional(),
+      linkedin_url: z.string().url().max(500).optional(),
+      website_url: z.string().url().max(500).optional(),
+      status: z.enum(['none', 'cold', 'warm', 'hot', 'won', 'lost_maybe_later', 'lost_not_fit']).optional(),
+      relationship_type: z.enum(['lead', 'lead_amplifier', 'past_client', 'friend_family', 'associate_partner', 'referral_source', 'booked_client']).optional(),
+      category: z.string().max(100).optional(),
+      source: z.string().max(200).optional(),
+      notes: z.string().max(10000).optional(),
+      social_media_links: z.object({
+        instagram: z.string().max(100).optional(),
+        twitter: z.string().max(100).optional(),
+        facebook: z.string().max(100).optional(),
+        tiktok: z.string().max(100).optional()
+      }).optional()
+    });
 
-    // Validate required fields
-    if (!contactData.email) {
-      return new Response(JSON.stringify({ error: 'Email is required' }), {
+    // Parse and validate request body
+    const rawBody = await req.json();
+    const validationResult = ContactDataSchema.safeParse(rawBody);
+
+    if (!validationResult.success) {
+      console.error('Contact data validation failed:', validationResult.error);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid contact data',
+        code: 'VALIDATION_ERROR'
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const contactData = validationResult.data;
 
     // Prepare contact data with defaults
     const contactPayload = {
@@ -135,7 +168,10 @@ serve(async (req) => {
 
     if (contactError) {
       console.error('Contact upsert failed:', contactError);
-      return new Response(JSON.stringify({ error: 'Failed to create/update contact' }), {
+      return new Response(JSON.stringify({ 
+        error: 'An error occurred processing your request',
+        code: 'OPERATION_FAILED'
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -169,7 +205,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in integrations-inbound function:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({ 
+      error: 'An error occurred processing your request',
+      code: 'INTERNAL_ERROR'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

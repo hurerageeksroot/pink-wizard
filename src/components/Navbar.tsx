@@ -8,26 +8,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { 
-  Menu, 
-  User, 
-  LogOut, 
-  Settings, 
+import {
+  Menu,
+  User,
+  LogOut,
+  Settings,
   HelpCircle,
   Phone,
   FileText,
   Shield,
   Users,
-  Target
+  Target,
 } from "lucide-react";
+import AppNavbar from "./Navbar/AppNavbar";
 
 const navigation = [
   { name: "Features", href: "/features" },
@@ -44,14 +41,14 @@ export function Navbar() {
   const location = useLocation();
 
   const handleSignOut = async () => {
-    console.log('[Navbar] Attempting to sign out...');
+    console.log("[Navbar] Attempting to sign out...");
     const { error } = await signOut();
     if (error) {
-      console.error('[Navbar] Sign out error:', error);
+      console.error("[Navbar] Sign out error:", error);
       // Force sign out by clearing local state and redirecting anyway
       navigate("/auth");
     } else {
-      console.log('[Navbar] Sign out successful');
+      console.log("[Navbar] Sign out successful");
       navigate("/");
     }
   };
@@ -64,15 +61,12 @@ export function Navbar() {
     <nav className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Sidebar Toggle + Logo */}
+          {/* Logo */}
           <div className="flex items-center space-x-4">
-            {user && (
-              <SidebarTrigger className="md:flex" />
-            )}
             <Link to="/" className="flex items-center space-x-2">
-              <img 
-                src="/lovable-uploads/1a800238-fd78-463f-9718-1bca6df098ea.png" 
-                alt="PinkWizard Logo" 
+              <img
+                src="/lovable-uploads/1a800238-fd78-463f-9718-1bca6df098ea.png"
+                alt="PinkWizard Logo"
                 className="h-8"
               />
             </Link>
@@ -99,9 +93,7 @@ export function Navbar() {
                 key={item.name}
                 to={item.href}
                 className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isActive(item.href)
-                    ? "text-primary"
-                    : "text-muted-foreground"
+                  isActive(item.href) ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 {item.name}
@@ -114,7 +106,11 @@ export function Navbar() {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center space-x-2"
+                  >
                     <User className="h-4 w-4" />
                     <span className="hidden sm:inline">{user.email}</span>
                   </Button>
@@ -137,10 +133,13 @@ export function Navbar() {
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" onClick={() => {
-                  console.log('[Navbar] Sign In clicked');
-                  navigate("/auth?tab=signin");
-                }}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    console.log("[Navbar] Sign In clicked");
+                    navigate("/auth?tab=signin");
+                  }}
+                >
                   Sign In
                 </Button>
                 {!isActive("/auth") && (
@@ -163,9 +162,9 @@ export function Navbar() {
               <SheetContent side="right" className="w-72">
                 <div className="flex flex-col space-y-6 mt-6">
                   {/* Mobile Logo */}
-                  <img 
-                    src="/lovable-uploads/1a800238-fd78-463f-9718-1bca6df098ea.png" 
-                    alt="PinkWizard Logo" 
+                  <img
+                    src="/lovable-uploads/1a800238-fd78-463f-9718-1bca6df098ea.png"
+                    alt="PinkWizard Logo"
                     className="h-6"
                   />
 
@@ -187,72 +186,72 @@ export function Navbar() {
                     ))}
                   </div>
 
-                   {/* Mobile Auth */}
-                   {user ? (
-                     <div className="flex flex-col space-y-4 pt-4 border-t">
-                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                         <User className="h-4 w-4" />
-                         <span>{user.email}</span>
-                       </div>
-                       <Button
-                         variant="ghost"
-                         className="justify-start"
-                         onClick={() => {
-                           navigate("/?tab=dashboard");
-                           setIsOpen(false);
-                         }}
-                       >
-                         <Target className="mr-2 h-4 w-4" />
-                         Dashboard
-                       </Button>
-                       <Button
-                         variant="ghost"
-                         className="justify-start"
-                         onClick={() => {
-                           navigate("/settings");
-                           setIsOpen(false);
-                         }}
-                       >
-                         <Settings className="mr-2 h-4 w-4" />
-                         Settings
-                       </Button>
-                       <Button
-                         variant="ghost"
-                         className="justify-start"
-                         onClick={() => {
-                           handleSignOut();
-                           setIsOpen(false);
-                         }}
-                       >
-                         <LogOut className="mr-2 h-4 w-4" />
-                         Sign Out
-                       </Button>
-                     </div>
-                   ) : (
-                     <div className="flex flex-col space-y-3 pt-4 border-t">
-                         <Button
-                           variant="ghost"
-                           className="justify-start"
-                           onClick={() => {
-                             navigate("/auth?tab=signin");
-                             setIsOpen(false);
-                           }}
-                         >
-                           Sign In
-                         </Button>
-                        {!isActive("/auth") && (
-                          <Button
-                            className="justify-start"
-                            onClick={() => {
-                              navigate("/auth?tab=signup");
-                              setIsOpen(false);
-                            }}
-                          >
-                            Get Started
-                          </Button>
-                        )}
-                     </div>
-                   )}
+                  {/* Mobile Auth */}
+                  {user ? (
+                    <div className="flex flex-col space-y-4 pt-4 border-t">
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <User className="h-4 w-4" />
+                        <span>{user.email}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => {
+                          navigate("/?tab=dashboard");
+                          setIsOpen(false);
+                        }}
+                      >
+                        <Target className="mr-2 h-4 w-4" />
+                        Dashboard
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => {
+                          navigate("/settings");
+                          setIsOpen(false);
+                        }}
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Settings
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => {
+                          handleSignOut();
+                          setIsOpen(false);
+                        }}
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col space-y-3 pt-4 border-t">
+                      <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => {
+                          navigate("/auth?tab=signin");
+                          setIsOpen(false);
+                        }}
+                      >
+                        Sign In
+                      </Button>
+                      {!isActive("/auth") && (
+                        <Button
+                          className="justify-start"
+                          onClick={() => {
+                            navigate("/auth?tab=signup");
+                            setIsOpen(false);
+                          }}
+                        >
+                          Get Started
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Mobile Footer Links */}
                   <div className="flex flex-col space-y-3 pt-4 border-t text-xs text-muted-foreground">
@@ -282,3 +281,9 @@ export function Navbar() {
     </nav>
   );
 }
+
+export const NavbarWrapper = () => {
+  const { user, signOut } = useAuth();
+
+  return user ? <AppNavbar /> : <Navbar />;
+};

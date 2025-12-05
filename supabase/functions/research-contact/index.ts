@@ -35,6 +35,20 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
+    const body = await req.json();
+    const { contactId } = body;
+    
+    // Enhanced input validation - security fix
+    if (!contactId || typeof contactId !== 'string') {
+      throw new Error('Valid contact ID is required');
+    }
+    
+    // Validate UUID format to prevent injection
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(contactId)) {
+      throw new Error('Invalid contact ID format');
+    }
+
     // Check AI quota
     const { data: quotaData, error: quotaError } = await supabaseClient.rpc('get_my_ai_quota');
     if (quotaError) {
@@ -55,12 +69,7 @@ serve(async (req) => {
 
     console.log('AI quota check passed:', quota);
 
-    const { contactId } = await req.json();
-    if (!contactId) {
-      throw new Error('Contact ID is required');
-    }
-
-    // Get contact details
+    // Get contact details (contactId already validated above)
     const { data: contact, error: contactError } = await supabaseClient
       .from('contacts')
       .select('*')
@@ -106,7 +115,13 @@ serve(async (req) => {
     }
 
     // Start research process
-    let researchData = {
+    let researchData: {
+      bio: string;
+      keyFacts: string[];
+      icebreakers: string[];
+      outreachAngles: string[];
+      sources: Array<{ url: string; content: string; timestamp: string }>;
+    } = {
       bio: '',
       keyFacts: [],
       icebreakers: [],
@@ -119,6 +134,9 @@ serve(async (req) => {
       const urlsToResearch = [
         contact.website_url,
         contact.linkedin_url,
+        contact.social_media_links?.instagram 
+          ? `https://www.instagram.com/${contact.social_media_links.instagram.replace('@', '')}`
+          : null,
         contact.company ? `https://www.google.com/search?q="${contact.company}"` : null
       ].filter(Boolean);
 
@@ -136,10 +154,10 @@ serve(async (req) => {
               timeout: 10000
             });
             
-            if (crawlResult.success && crawlResult.data?.markdown) {
+            if (crawlResult.success && (crawlResult as any).data?.markdown) {
               researchData.sources.push({
                 url,
-                content: crawlResult.data.markdown.substring(0, 2000), // Limit content
+                content: (crawlResult as any).data.markdown.substring(0, 2000), // Limit content
                 timestamp: new Date().toISOString()
               });
               console.log('Successfully crawled:', url);
@@ -157,9 +175,10 @@ serve(async (req) => {
 Name: ${contact.name}
 Company: ${contact.company || 'N/A'}
 Position: ${contact.position || 'N/A'}
-Email: ${contact.email}
+Email: ${contact.email || 'Not yet found'}
 Phone: ${contact.phone || 'N/A'}
 LinkedIn: ${contact.linkedin_url || 'N/A'}
+Instagram: ${contact.social_media_links?.instagram ? '@' + contact.social_media_links.instagram : 'N/A'}
 Website: ${contact.website_url || 'N/A'}
 Notes: ${contact.notes || 'N/A'}
 Category: ${contact.category}
@@ -178,10 +197,17 @@ WEB RESEARCH:
 ${webContent || 'No web research available'}
 
 Please provide a structured response with:
-1. Professional bio/background (2-3 sentences)
-2. Key facts (3-5 bullet points)
+1. Professional bio/background (2-3 sentences) - if this is an Instagram profile, extract their full business name
+2. Key facts (3-5 bullet points) - include any contact information found (email, phone, website)
 3. Conversation icebreakers (3-4 suggestions)
 4. Outreach angles (3-4 professional approaches)
+
+IMPORTANT: If this is an Instagram business profile, pay special attention to extracting:
+- Business email addresses from bio
+- Website URLs from bio  
+- Business phone numbers
+- Full business name (not just username)
+- Location/service area
 
 Focus on professional, warm networking approaches. Be specific and actionable.`;
 
@@ -216,7 +242,7 @@ Focus on professional, warm networking approaches. Be specific and actionable.`;
           const insights = aiResult.choices[0].message.content;
           
           // Parse the structured response (simplified)
-          const lines = insights.split('\n').filter(line => line.trim());
+          const lines = insights.split('\n').filter((line: string) => line.trim());
           let currentSection = '';
           
           for (const line of lines) {
@@ -232,7 +258,7 @@ Focus on professional, warm networking approaches. Be specific and actionable.`;
             } else if (trimmed.startsWith('-') || trimmed.startsWith('•') || /^\d+\./.test(trimmed)) {
               const cleanText = trimmed.replace(/^[-•\d\.\s]+/, '').trim();
               if (cleanText && currentSection && currentSection !== 'bio') {
-                researchData[currentSection].push(cleanText);
+                (researchData as any)[currentSection].push(cleanText);
               }
             } else if (currentSection === 'bio' && trimmed && !trimmed.includes(':')) {
               researchData.bio += (researchData.bio ? ' ' : '') + trimmed;
@@ -240,6 +266,30 @@ Focus on professional, warm networking approaches. Be specific and actionable.`;
           }
           
           console.log('AI insights generated successfully');
+          
+          // Extract contact information from insights
+          const emailMatch = insights.match(/email[:\s]+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+          const websiteMatch = insights.match(/website[:\s]+(https?:\/\/[^\s]+)/i);
+          const phoneMatch = insights.match(/phone[:\s]+(\+?[\d\s()-]{10,})/i);
+          const businessNameMatch = insights.match(/business name[:\s]+([^\n]+)/i);
+
+          // Update contact if we found new information
+          if (emailMatch || websiteMatch || phoneMatch || businessNameMatch) {
+            const updates: any = {};
+            if (emailMatch && !contact.email) updates.email = emailMatch[1];
+            if (websiteMatch && !contact.website_url) updates.website_url = websiteMatch[1];
+            if (phoneMatch && !contact.phone) updates.phone = phoneMatch[1];
+            if (businessNameMatch && contact.name.startsWith('@')) updates.name = businessNameMatch[1];
+            
+            if (Object.keys(updates).length > 0) {
+              await supabaseClient
+                .from('contacts')
+                .update(updates)
+                .eq('id', contactId);
+              
+              console.log('Auto-updated contact with enriched data:', updates);
+            }
+          }
           
           // Log AI usage
           await supabaseClient.from('ai_requests_log').insert({
@@ -313,7 +363,7 @@ Focus on professional, warm networking approaches. Be specific and actionable.`;
         .from('contact_research')
         .update({
           status: 'error',
-          error_message: researchError.message,
+          error_message: researchError instanceof Error ? researchError.message : 'Unknown error',
           updated_at: new Date().toISOString()
         })
         .eq('id', research.id);
@@ -324,7 +374,7 @@ Focus on professional, warm networking approaches. Be specific and actionable.`;
   } catch (error) {
     console.error('Error in research-contact function:', error);
     return new Response(JSON.stringify({ 
-      error: error.message || 'An unexpected error occurred' 
+      error: error instanceof Error ? error.message : 'An unexpected error occurred' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

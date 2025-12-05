@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          message_content: string | null
           response_received: boolean
           scheduled_for: string | null
           title: string
@@ -33,6 +34,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          message_content?: string | null
           response_received?: boolean
           scheduled_for?: string | null
           title: string
@@ -45,6 +47,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          message_content?: string | null
           response_received?: boolean
           scheduled_for?: string | null
           title?: string
@@ -367,6 +370,142 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_initiatives: {
+        Row: {
+          call_to_action: string | null
+          campaign_goal: string
+          created_at: string | null
+          deadline_date: string | null
+          description: string | null
+          end_date: string | null
+          event_date: string | null
+          event_location: string | null
+          id: string
+          is_active: boolean | null
+          key_benefits: Json | null
+          name: string
+          offer_type: string | null
+          proof_points: Json | null
+          start_date: string | null
+          target_relationship_types: Json | null
+          target_segments: Json | null
+          tone: string | null
+          updated_at: string | null
+          urgency_level: string | null
+          user_id: string
+          value_proposition: string | null
+        }
+        Insert: {
+          call_to_action?: string | null
+          campaign_goal: string
+          created_at?: string | null
+          deadline_date?: string | null
+          description?: string | null
+          end_date?: string | null
+          event_date?: string | null
+          event_location?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_benefits?: Json | null
+          name: string
+          offer_type?: string | null
+          proof_points?: Json | null
+          start_date?: string | null
+          target_relationship_types?: Json | null
+          target_segments?: Json | null
+          tone?: string | null
+          updated_at?: string | null
+          urgency_level?: string | null
+          user_id: string
+          value_proposition?: string | null
+        }
+        Update: {
+          call_to_action?: string | null
+          campaign_goal?: string
+          created_at?: string | null
+          deadline_date?: string | null
+          description?: string | null
+          end_date?: string | null
+          event_date?: string | null
+          event_location?: string | null
+          id?: string
+          is_active?: boolean | null
+          key_benefits?: Json | null
+          name?: string
+          offer_type?: string | null
+          proof_points?: Json | null
+          start_date?: string | null
+          target_relationship_types?: Json | null
+          target_segments?: Json | null
+          tone?: string | null
+          updated_at?: string | null
+          urgency_level?: string | null
+          user_id?: string
+          value_proposition?: string | null
+        }
+        Relationships: []
+      }
+      campaign_outreach_log: {
+        Row: {
+          activity_id: string | null
+          ai_tokens_used: number | null
+          campaign_id: string
+          channel: string | null
+          contact_id: string
+          contact_specific_goal: string | null
+          created_at: string | null
+          generated_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          ai_tokens_used?: number | null
+          campaign_id: string
+          channel?: string | null
+          contact_id: string
+          contact_specific_goal?: string | null
+          created_at?: string | null
+          generated_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          ai_tokens_used?: number | null
+          campaign_id?: string
+          channel?: string | null
+          contact_id?: string
+          contact_specific_goal?: string | null
+          created_at?: string | null
+          generated_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_outreach_log_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_outreach_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_initiatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_outreach_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_config: {
         Row: {
           created_at: string
@@ -579,6 +718,88 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_context_assignments: {
+        Row: {
+          contact_id: string
+          context_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          contact_id: string
+          context_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          contact_id?: string
+          context_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_context_assignments_context_id_fkey"
+            columns: ["context_id"]
+            isOneToOne: false
+            referencedRelation: "contact_contexts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_contact_context_assignments_contact_id"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_contact_context_assignments_context_id"
+            columns: ["context_id"]
+            isOneToOne: false
+            referencedRelation: "contact_contexts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_contexts: {
+        Row: {
+          color_class: string
+          created_at: string
+          icon_name: string
+          id: string
+          is_default: boolean
+          label: string
+          name: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color_class?: string
+          created_at?: string
+          icon_name?: string
+          id?: string
+          is_default?: boolean
+          label: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color_class?: string
+          created_at?: string
+          icon_name?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       contact_research: {
         Row: {
           contact_id: string
@@ -630,7 +851,7 @@ export type Database = {
           company: string | null
           country: string | null
           created_at: string
-          email: string
+          email: string | null
           id: string
           is_demo: boolean
           last_contact_date: string | null
@@ -640,6 +861,8 @@ export type Database = {
           notes: string | null
           phone: string | null
           position: string | null
+          relationship_intent: string | null
+          relationship_status: string | null
           relationship_type: string
           response_received: boolean
           revenue_amount: number | null
@@ -662,7 +885,7 @@ export type Database = {
           company?: string | null
           country?: string | null
           created_at?: string
-          email: string
+          email?: string | null
           id?: string
           is_demo?: boolean
           last_contact_date?: string | null
@@ -672,6 +895,8 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           position?: string | null
+          relationship_intent?: string | null
+          relationship_status?: string | null
           relationship_type?: string
           response_received?: boolean
           revenue_amount?: number | null
@@ -694,7 +919,7 @@ export type Database = {
           company?: string | null
           country?: string | null
           created_at?: string
-          email?: string
+          email?: string | null
           id?: string
           is_demo?: boolean
           last_contact_date?: string | null
@@ -704,6 +929,8 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           position?: string | null
+          relationship_intent?: string | null
+          relationship_status?: string | null
           relationship_type?: string
           response_received?: boolean
           revenue_amount?: number | null
@@ -1230,6 +1457,7 @@ export type Database = {
           overall_progress: number
           rank_position: number | null
           total_days_completed: number
+          total_points: number
           user_id: string
         }
         Insert: {
@@ -1243,6 +1471,7 @@ export type Database = {
           overall_progress?: number
           rank_position?: number | null
           total_days_completed?: number
+          total_points?: number
           user_id: string
         }
         Update: {
@@ -1256,6 +1485,7 @@ export type Database = {
           overall_progress?: number
           rank_position?: number | null
           total_days_completed?: number
+          total_points?: number
           user_id?: string
         }
         Relationships: []
@@ -1390,7 +1620,7 @@ export type Database = {
           accessed_at: string
           attempted_email: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           success: boolean
           user_agent: string | null
           user_id: string | null
@@ -1399,7 +1629,7 @@ export type Database = {
           accessed_at?: string
           attempted_email: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           success: boolean
           user_agent?: string | null
           user_id?: string | null
@@ -1408,7 +1638,7 @@ export type Database = {
           accessed_at?: string
           attempted_email?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           success?: boolean
           user_agent?: string | null
           user_id?: string | null
@@ -1421,7 +1651,7 @@ export type Database = {
           action: string
           created_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           payment_id: string | null
           user_agent: string | null
           user_id: string | null
@@ -1431,7 +1661,7 @@ export type Database = {
           action: string
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           payment_id?: string | null
           user_agent?: string | null
           user_id?: string | null
@@ -1441,7 +1671,7 @@ export type Database = {
           action?: string
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           payment_id?: string | null
           user_agent?: string | null
           user_id?: string | null
@@ -1564,6 +1794,36 @@ export type Database = {
         }
         Relationships: []
       }
+      points_values: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          points: number
+          updated_at: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          points?: number
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          points?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1573,6 +1833,7 @@ export type Database = {
           id: string
           location: string | null
           show_in_leaderboard: boolean
+          sidebar_click_to_expand: boolean | null
           timezone: string | null
           updated_at: string
         }
@@ -1584,6 +1845,7 @@ export type Database = {
           id: string
           location?: string | null
           show_in_leaderboard?: boolean
+          sidebar_click_to_expand?: boolean | null
           timezone?: string | null
           updated_at?: string
         }
@@ -1595,6 +1857,7 @@ export type Database = {
           id?: string
           location?: string | null
           show_in_leaderboard?: boolean
+          sidebar_click_to_expand?: boolean | null
           timezone?: string | null
           updated_at?: string
         }
@@ -1644,6 +1907,173 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "educational_resources"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospect_searches: {
+        Row: {
+          created_at: string | null
+          id: string
+          prospects_found: number | null
+          search_date: string | null
+          search_params: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          prospects_found?: number | null
+          search_date?: string | null
+          search_params?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          prospects_found?: number | null
+          search_date?: string | null
+          search_params?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      prospect_suggestions: {
+        Row: {
+          company: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          linkedin_url: string | null
+          location: string | null
+          match_reasons: string[] | null
+          match_score: number | null
+          name: string
+          phone: string | null
+          position: string | null
+          search_date: string | null
+          source_url: string | null
+          status: string | null
+          user_id: string
+          website_url: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          linkedin_url?: string | null
+          location?: string | null
+          match_reasons?: string[] | null
+          match_score?: number | null
+          name: string
+          phone?: string | null
+          position?: string | null
+          search_date?: string | null
+          source_url?: string | null
+          status?: string | null
+          user_id: string
+          website_url?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          linkedin_url?: string | null
+          location?: string | null
+          match_reasons?: string[] | null
+          match_score?: number | null
+          name?: string
+          phone?: string | null
+          position?: string | null
+          search_date?: string | null
+          source_url?: string | null
+          status?: string | null
+          user_id?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      relationship_intent_configs: {
+        Row: {
+          color_class: string
+          created_at: string
+          default_status: string
+          description: string | null
+          icon_name: string
+          id: string
+          intent: string
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          color_class?: string
+          created_at?: string
+          default_status?: string
+          description?: string | null
+          icon_name?: string
+          id?: string
+          intent: string
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          color_class?: string
+          created_at?: string
+          default_status?: string
+          description?: string | null
+          icon_name?: string
+          id?: string
+          intent?: string
+          label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      relationship_status_options: {
+        Row: {
+          color_class: string
+          created_at: string
+          description: string | null
+          id: string
+          intent: string
+          is_terminal: boolean
+          label: string
+          sort_order: number
+          status_key: string
+          updated_at: string
+        }
+        Insert: {
+          color_class?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          intent: string
+          is_terminal?: boolean
+          label: string
+          sort_order?: number
+          status_key: string
+          updated_at?: string
+        }
+        Update: {
+          color_class?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          intent?: string
+          is_terminal?: boolean
+          label?: string
+          sort_order?: number
+          status_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationship_status_options_intent_fkey"
+            columns: ["intent"]
+            isOneToOne: false
+            referencedRelation: "relationship_intent_configs"
+            referencedColumns: ["intent"]
           },
         ]
       }
@@ -1944,8 +2374,51 @@ export type Database = {
           },
         ]
       }
+      user_icp: {
+        Row: {
+          created_at: string | null
+          generated_from_contacts: string[] | null
+          geographic_scope: string | null
+          id: string
+          key_characteristics: string | null
+          target_company_sizes: string[] | null
+          target_industries: string[] | null
+          target_job_titles: string[] | null
+          target_locations: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          generated_from_contacts?: string[] | null
+          geographic_scope?: string | null
+          id?: string
+          key_characteristics?: string | null
+          target_company_sizes?: string[] | null
+          target_industries?: string[] | null
+          target_job_titles?: string[] | null
+          target_locations?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          generated_from_contacts?: string[] | null
+          geographic_scope?: string | null
+          id?: string
+          key_characteristics?: string | null
+          target_company_sizes?: string[] | null
+          target_industries?: string[] | null
+          target_job_titles?: string[] | null
+          target_locations?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_metrics: {
         Row: {
+          activity_id: string | null
           challenge_day: number
           contact_id: string | null
           created_at: string
@@ -1959,6 +2432,7 @@ export type Database = {
           value: number
         }
         Insert: {
+          activity_id?: string | null
           challenge_day: number
           contact_id?: string | null
           created_at?: string
@@ -1972,6 +2446,7 @@ export type Database = {
           value: number
         }
         Update: {
+          activity_id?: string | null
           challenge_day?: number
           contact_id?: string | null
           created_at?: string
@@ -1985,6 +2460,13 @@ export type Database = {
           value?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "user_metrics_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_metrics_contact_id_fkey"
             columns: ["contact_id"]
@@ -2138,6 +2620,93 @@ export type Database = {
           project_description?: string | null
           project_name?: string
           target_completion_day?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_relationship_category_preferences: {
+        Row: {
+          category_label: string
+          category_name: string
+          created_at: string
+          custom_color_class: string | null
+          display_order: number
+          id: string
+          is_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_label: string
+          category_name: string
+          created_at?: string
+          custom_color_class?: string | null
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_label?: string
+          category_name?: string
+          created_at?: string
+          custom_color_class?: string | null
+          display_order?: number
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_relationship_types: {
+        Row: {
+          color_class: string
+          created_at: string
+          icon_name: string
+          id: string
+          is_default: boolean
+          is_lead_type: boolean
+          label: string
+          name: string
+          relationship_intent:
+            | Database["public"]["Enums"]["relationship_intent"]
+            | null
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color_class?: string
+          created_at?: string
+          icon_name?: string
+          id?: string
+          is_default?: boolean
+          is_lead_type?: boolean
+          label: string
+          name: string
+          relationship_intent?:
+            | Database["public"]["Enums"]["relationship_intent"]
+            | null
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color_class?: string
+          created_at?: string
+          icon_name?: string
+          id?: string
+          is_default?: boolean
+          is_lead_type?: boolean
+          label?: string
+          name?: string
+          relationship_intent?:
+            | Database["public"]["Enums"]["relationship_intent"]
+            | null
+          sort_order?: number
           updated_at?: string
           user_id?: string
         }
@@ -2309,6 +2878,54 @@ export type Database = {
         }
         Relationships: []
       }
+      waitlist: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          invited_at: string | null
+          last_name: string | null
+          metadata: Json | null
+          position: string | null
+          referral_source: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id?: string
+          invited_at?: string | null
+          last_name?: string | null
+          metadata?: Json | null
+          position?: string | null
+          referral_source?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          invited_at?: string | null
+          last_name?: string | null
+          metadata?: Json | null
+          position?: string | null
+          referral_source?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       weekly_tasks_definition: {
         Row: {
           category: string | null
@@ -2391,6 +3008,15 @@ export type Database = {
       }
     }
     Functions: {
+      admin_complete_daily_task: {
+        Args: {
+          admin_notes?: string
+          challenge_day_param: number
+          target_user_id: string
+          task_definition_id: string
+        }
+        Returns: Json
+      }
       admin_complete_weekly_task: {
         Args: {
           admin_notes?: string
@@ -2400,6 +3026,7 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_refresh_leaderboard: { Args: never; Returns: Json }
       admin_toggle_user_challenge: {
         Args: { enable_challenge: boolean; target_user_id: string }
         Returns: Json
@@ -2408,10 +3035,7 @@ export type Database = {
         Args: { p_enable: boolean; p_target_user_id: string }
         Returns: Json
       }
-      anonymize_payment_audit_logs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      anonymize_payment_audit_logs: { Args: never; Returns: number }
       audit_function_call: {
         Args: { function_name: string; user_id_param?: string }
         Returns: undefined
@@ -2420,57 +3044,52 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
-      automated_security_maintenance: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      award_challenge_prizes: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      award_points: {
-        Args: {
-          p_activity_type: string
-          p_challenge_day?: number
-          p_description: string
-          p_metadata?: Json
-          p_user_id: string
-        }
-        Returns: boolean
-      }
-      backfill_all_daily_tasks: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      backfill_contact_added_points: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      backfill_missing_activity_points: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      backfill_missing_contact_points: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      automated_security_maintenance: { Args: never; Returns: undefined }
+      award_challenge_prizes: { Args: never; Returns: Json }
+      award_points:
+        | {
+            Args: {
+              p_activity_type: string
+              p_description: string
+              p_metadata?: Json
+              p_skip_milestone_checks?: boolean
+              p_user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_activity_type: string
+              p_challenge_day?: number
+              p_description?: string
+              p_metadata?: Json
+              p_points: number
+              p_user_id: string
+            }
+            Returns: Json
+          }
+      backfill_all_daily_tasks: { Args: never; Returns: number }
+      backfill_contact_added_points: { Args: never; Returns: number }
+      backfill_missing_activity_points: { Args: never; Returns: Json }
+      backfill_missing_contact_points: { Args: never; Returns: Json }
       backfill_networking_program_task_completions: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: undefined
       }
-      broadcast_challenge_email: {
-        Args:
-          | { p_template_key: string }
-          | { subject_override_param?: string; template_key_param: string }
-        Returns: Json
-      }
+      broadcast_challenge_email:
+        | { Args: { p_template_key: string }; Returns: Json }
+        | {
+            Args: {
+              subject_override_param?: string
+              template_key_param: string
+            }
+            Returns: Json
+          }
       check_and_award_badges: {
         Args: { p_event_data?: Json; p_event_type: string; p_user_id: string }
-        Returns: {
-          badge_id: string
-          badge_name: string
-        }[]
+        Returns: Json
       }
+      check_leaderboard_health: { Args: never; Returns: Json }
       check_milestone_bonuses_intelligent: {
         Args: { p_current_total_points: number; p_user_id: string }
         Returns: undefined
@@ -2483,56 +3102,33 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
-      check_user_onboarding_status: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      check_user_onboarding_status: { Args: never; Returns: Json }
       check_user_payment_access: {
         Args: { check_user_id: string }
         Returns: Json
       }
-      cleanup_old_audit_logs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      controlled_milestone_check: {
-        Args: { p_user_id: string }
-        Returns: Json
-      }
+      cleanup_old_audit_logs: { Args: never; Returns: number }
+      controlled_milestone_check: { Args: { p_user_id: string }; Returns: Json }
       create_payment_secure: {
         Args: { payment_data: Json; requester_user_id: string }
         Returns: string
       }
-      encrypt_payment_field: {
-        Args: { field_value: string }
-        Returns: string
-      }
+      encrypt_payment_field: { Args: { field_value: string }; Returns: string }
       enhanced_encrypt_payment_field: {
         Args: { field_type?: string; field_value: string }
         Returns: string
       }
+      ensure_past_client_type: { Args: never; Returns: undefined }
       ensure_user_daily_task_exists: {
         Args: { p_challenge_day: number; p_task_id: string; p_user_id: string }
         Returns: string
       }
-      get_active_challenge_participant_count: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      get_admin_activity_breakdown: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_admin_comprehensive_stats: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_admin_emails: {
-        Args: Record<PropertyKey, never>
-        Returns: string[]
-      }
+      get_active_challenge_participant_count: { Args: never; Returns: number }
+      get_admin_activity_breakdown: { Args: never; Returns: Json }
+      get_admin_comprehensive_stats: { Args: never; Returns: Json }
+      get_admin_emails: { Args: never; Returns: string[] }
       get_admin_user_analytics: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           contacts_count: number
           created_at: string
@@ -2546,7 +3142,7 @@ export type Database = {
         }[]
       }
       get_admin_user_details: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           company_name: string
@@ -2561,12 +3157,9 @@ export type Database = {
           show_in_leaderboard: boolean
         }[]
       }
-      get_admin_user_growth_data: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      get_admin_user_growth_data: { Args: never; Returns: Json }
       get_admin_user_list: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           company_name: string
@@ -2582,7 +3175,7 @@ export type Database = {
         }[]
       }
       get_admin_users_with_challenge: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           challenge_active: boolean
@@ -2602,7 +3195,7 @@ export type Database = {
         }[]
       }
       get_anonymized_leaderboard_data: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           anonymized_user_id: string
           avatar_url: string
@@ -2614,7 +3207,7 @@ export type Database = {
         }[]
       }
       get_challenge_stats: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           active_participants: number
           avg_days_completed: number
@@ -2622,20 +3215,11 @@ export type Database = {
           total_participants: number
         }[]
       }
-      get_comprehensive_admin_stats: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_current_challenge_day: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      get_enhanced_encryption_key: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_comprehensive_admin_stats: { Args: never; Returns: Json }
+      get_current_challenge_day: { Args: never; Returns: number }
+      get_enhanced_encryption_key: { Args: never; Returns: string }
       get_enriched_leaderboard_data: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           completion_rate: number
@@ -2654,7 +3238,7 @@ export type Database = {
         }[]
       }
       get_my_ai_quota: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           credits_remaining: number
           monthly_quota: number
@@ -2667,7 +3251,7 @@ export type Database = {
         }[]
       }
       get_my_challenge_goals_and_progress: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           events_current: number
@@ -2693,12 +3277,9 @@ export type Database = {
           status: string
         }[]
       }
-      get_payment_encryption_key: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_payment_encryption_key: { Args: never; Returns: string }
       get_points_leaderboard: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           display_name: string
@@ -2709,7 +3290,7 @@ export type Database = {
         }[]
       }
       get_revenue_leaderboard: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           contacts_count: number
@@ -2719,14 +3300,19 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_todays_full_completions: {
-        Args: Record<PropertyKey, never>
-        Returns: number
+      get_streak_bonus_candidates: {
+        Args: never
+        Returns: {
+          bonus_points: number
+          current_streak: number
+          display_name: string
+          eligible_bonus_type: string
+          last_streak_bonus_awarded: string
+          user_id: string
+        }[]
       }
-      get_user_access_status: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      get_todays_full_completions: { Args: never; Returns: number }
+      get_user_access_status: { Args: never; Returns: Json }
       get_user_challenge_day: {
         Args: { user_id_param: string; user_timezone?: string }
         Returns: number
@@ -2746,10 +3332,7 @@ export type Database = {
         Args: { user_id_param: string; user_timezone?: string }
         Returns: number
       }
-      get_user_email_data: {
-        Args: { p_user_id: string }
-        Returns: Json
-      }
+      get_user_email_data: { Args: { p_user_id: string }; Returns: Json }
       get_user_program_tasks_with_definitions: {
         Args: { p_user_id: string }
         Returns: {
@@ -2763,10 +3346,29 @@ export type Database = {
           user_task_id: string
         }[]
       }
-      is_admin: {
-        Args: { user_id_param?: string }
-        Returns: boolean
+      get_weekly_outreach_bonus_candidates: {
+        Args: never
+        Returns: {
+          already_awarded: boolean
+          display_name: string
+          user_id: string
+          weekly_activity_count: number
+        }[]
       }
+      get_weekly_wins_bonus_candidates: {
+        Args: never
+        Returns: {
+          already_awarded: boolean
+          display_name: string
+          user_id: string
+          weekly_wins: number
+        }[]
+      }
+      initialize_default_relationship_categories: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      is_admin: { Args: { user_id_param?: string }; Returns: boolean }
       is_demo_contact: {
         Args: {
           p_company: string
@@ -2800,26 +3402,13 @@ export type Database = {
         Args: { payment_id: string; requester_user_id: string }
         Returns: Json
       }
-      process_scheduled_email_sequences: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      process_scheduled_email_sequences: { Args: never; Returns: number }
       process_variable_reward: {
         Args: { p_context_data?: Json; p_event_type: string; p_user_id: string }
-        Returns: {
-          reward_description: string
-          reward_earned: boolean
-          reward_name: string
-        }[]
+        Returns: Json
       }
-      remove_demo_data_for_user: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      secure_audit_cleanup: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      remove_demo_data_for_user: { Args: never; Returns: undefined }
+      secure_audit_cleanup: { Args: never; Returns: undefined }
       secure_audit_payment_access: {
         Args: {
           access_type: string
@@ -2840,6 +3429,22 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      seed_default_contact_contexts: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      seed_default_relationship_types: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      seed_default_relationship_types_for_user: {
+        Args: { target_user_id: string }
+        Returns: undefined
+      }
+      seed_relationship_types_for_category: {
+        Args: { p_category_name: string; p_user_id: string }
+        Returns: number
+      }
       seed_user_categories_and_backfill: {
         Args: { user_id_param: string }
         Returns: undefined
@@ -2853,29 +3458,29 @@ export type Database = {
         }
         Returns: Json
       }
-      trigger_email_sequence: {
-        Args:
-          | { event_name: string; target_user_id: string; variables?: Json }
-          | {
+      trigger_email_sequence:
+        | {
+            Args: {
               p_trigger_event: string
               p_user_email: string
               p_user_id: string
               p_variables?: Json
             }
-        Returns: boolean
-      }
-      trigger_weekly_bonus_checks: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      update_daily_challenge_progress: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      update_leaderboard_stats: {
-        Args: Record<PropertyKey, never> | { user_id_param: string }
-        Returns: undefined
-      }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              event_name: string
+              target_user_id: string
+              variables?: Json
+            }
+            Returns: undefined
+          }
+      trigger_weekly_bonus_checks: { Args: never; Returns: undefined }
+      update_daily_challenge_progress: { Args: never; Returns: undefined }
+      update_leaderboard_stats:
+        | { Args: { user_id_param: string }; Returns: undefined }
+        | { Args: never; Returns: undefined }
       update_user_progress: {
         Args: {
           p_current_streak?: number
@@ -2895,10 +3500,9 @@ export type Database = {
         }
         Returns: Json
       }
-      user_can_write: {
-        Args: { user_id_param?: string }
-        Returns: boolean
-      }
+      user_can_write:
+        | { Args: never; Returns: boolean }
+        | { Args: { user_id_param: string }; Returns: boolean }
       user_can_write_secure: {
         Args: { user_id_param: string }
         Returns: boolean
@@ -2907,31 +3511,47 @@ export type Database = {
         Args: { user_id_param?: string }
         Returns: boolean
       }
-      user_has_valid_access: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      user_is_challenge_participant: {
-        Args: Record<PropertyKey, never> | { user_id_param?: string }
-        Returns: boolean
-      }
+      user_has_valid_access: { Args: never; Returns: boolean }
+      user_is_challenge_participant:
+        | { Args: never; Returns: boolean }
+        | { Args: { user_id_param?: string }; Returns: boolean }
       validate_payment_access: {
         Args: { payment_email: string }
         Returns: boolean
+      }
+      validate_points_integrity: {
+        Args: never
+        Returns: {
+          check_name: string
+          details: Json
+          status: string
+        }[]
       }
       verify_payment_integrity: {
         Args: { payment_id_param: string }
         Returns: Json
       }
-      verify_payment_security: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      verify_payment_security: { Args: never; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "user" | "moderator"
       badge_category: "milestone" | "consistency" | "performance" | "special"
       outreach_type: "cold" | "warm" | "social"
+      relationship_intent:
+        | "business_lead"
+        | "business_nurture"
+        | "personal_connection"
+        | "civic_engagement"
+        | "service_provider"
+        | "community_member"
+        | "philanthropy_nonprofit"
+        | "media_press"
+        | "other_misc"
+        | "business_lead_statuses"
+        | "business_nurture_statuses"
+        | "personal_statuses"
+        | "civic_statuses"
+        | "vendor_statuses"
       reward_type: "badge" | "points" | "title" | "cosmetic"
     }
     CompositeTypes: {
@@ -3063,6 +3683,22 @@ export const Constants = {
       app_role: ["admin", "user", "moderator"],
       badge_category: ["milestone", "consistency", "performance", "special"],
       outreach_type: ["cold", "warm", "social"],
+      relationship_intent: [
+        "business_lead",
+        "business_nurture",
+        "personal_connection",
+        "civic_engagement",
+        "service_provider",
+        "community_member",
+        "philanthropy_nonprofit",
+        "media_press",
+        "other_misc",
+        "business_lead_statuses",
+        "business_nurture_statuses",
+        "personal_statuses",
+        "civic_statuses",
+        "vendor_statuses",
+      ],
       reward_type: ["badge", "points", "title", "cosmetic"],
     },
   },

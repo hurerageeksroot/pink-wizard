@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, Activity, TrendingUp, Mail, Trophy, Settings, UserCog, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
+import ManualTaskCompletion from "@/components/Admin/ManualTaskCompletion";
+import { BackfillRevenueActivities } from "@/components/Admin/BackfillRevenueActivities";
 
 export default function EnhancedDashboard() {
   const { adminStats, loading } = useAdminData();
@@ -192,6 +194,12 @@ export default function EnhancedDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Admin Tools */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ManualTaskCompletion />
+        <BackfillRevenueActivities />
+      </div>
 
       {/* Recent Activity Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

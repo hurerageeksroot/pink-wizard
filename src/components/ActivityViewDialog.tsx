@@ -1,7 +1,7 @@
 import { Activity, Contact } from "@/types/crm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, MessageCircle, Calendar, Share2, Linkedin, CheckCircle2, Clock, DollarSign, UserCheck, MessageSquare } from "lucide-react";
+import { Mail, Phone, MessageCircle, Calendar, Share2, Linkedin, CheckCircle2, Clock, DollarSign, UserCheck, MessageSquare, Users } from "lucide-react";
 import { format } from "date-fns";
 
 interface ActivityViewDialogProps {
@@ -23,6 +23,7 @@ export function ActivityViewDialog({ open, onOpenChange, activity, contact }: Ac
       case 'linkedin': return <Linkedin {...iconProps} />;
       case 'meeting': return <Calendar {...iconProps} />;
       case 'text': return <MessageSquare {...iconProps} />;
+      case 'introduction': return <Users {...iconProps} />;
       case 'revenue': return <DollarSign {...iconProps} />;
       case 'status_change': return <UserCheck {...iconProps} />;
       default: return <MessageCircle {...iconProps} />;
@@ -37,6 +38,7 @@ export function ActivityViewDialog({ open, onOpenChange, activity, contact }: Ac
       case 'social': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800';
       case 'meeting': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800';
       case 'text': return 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/20 dark:text-teal-300 dark:border-teal-800';
+      case 'introduction': return 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800';
       case 'revenue': return 'bg-primary/10 text-primary border-primary/20 dark:bg-primary/20 dark:text-primary dark:border-primary/30';
       case 'status_change': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
       default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800';
@@ -45,6 +47,26 @@ export function ActivityViewDialog({ open, onOpenChange, activity, contact }: Ac
 
   const date = activity.completedAt || activity.createdAt;
   const isCompleted = !!activity.completedAt;
+
+  // Parse introduction data if this is an introduction activity
+  const parseIntroductionData = () => {
+    if (activity.type !== 'introduction' || !activity.description) {
+      return null;
+    }
+    
+    try {
+      const jsonMatch = activity.description.match(/INTRODUCTION_DATA:\s*(\{.*\})/);
+      if (jsonMatch && jsonMatch[1]) {
+        return JSON.parse(jsonMatch[1]);
+      }
+    } catch (error) {
+      console.error('Failed to parse introduction data:', error);
+    }
+    
+    return null;
+  };
+
+  const introductionData = parseIntroductionData();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,13 +98,29 @@ export function ActivityViewDialog({ open, onOpenChange, activity, contact }: Ac
             <p className="text-sm">{activity.title}</p>
           </div>
 
-          {/* Description */}
-          {activity.description && (
+          {/* Description / Introduction Details */}
+          {activity.type === 'introduction' && introductionData ? (
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-2">Introduction Details</h3>
+              <div className="space-y-2 text-sm">
+                <p>
+                  <span className="font-medium">{introductionData.contactA?.name}</span>
+                  {' introduced to '}
+                  <span className="font-medium">{introductionData.contactB?.name}</span>
+                </p>
+                {introductionData.context && (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium">Context:</span> {introductionData.context}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : activity.description && !activity.description.startsWith('INTRODUCTION_DATA:') ? (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-2">Notes</h3>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{activity.description}</p>
             </div>
-          )}
+          ) : null}
 
           {/* Date */}
           <div>

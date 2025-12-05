@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './useAuth';
 import { useChallenge } from './useChallenge';
@@ -22,6 +23,7 @@ interface RevenueDialogState {
 }
 
 export function useRevenueDialog() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
   const { isChallengeParticipant } = useChallenge();
@@ -35,26 +37,14 @@ export function useRevenueDialog() {
     currentRevenue: undefined
   });
 
-  // Debug logging for state changes
-  React.useEffect(() => {
-    console.log('=== useRevenueDialog state changed ===', dialogState);
-  }, [dialogState]);
-
   const openDialog = useCallback((contactName: string, contactId: string, contactStatus?: string, currentRevenue?: RevenueDialogState['currentRevenue']) => {
-    console.log('=== useRevenueDialog openDialog called ===', { contactName, contactId, contactStatus, currentRevenue });
-    setDialogState(prevState => {
-      console.log('=== Before state update ===', prevState);
-      const newState = {
-        isOpen: true,
-        contactName,
-        contactId,
-        contactStatus,
-        currentRevenue
-      };
-      console.log('=== Setting new state ===', newState);
-      return newState;
+    setDialogState({
+      isOpen: true,
+      contactName,
+      contactId,
+      contactStatus,
+      currentRevenue
     });
-    console.log('=== After state update dispatch ===');
   }, []);
 
   const closeDialog = () => {
@@ -71,15 +61,12 @@ export function useRevenueDialog() {
   React.useEffect(() => {
     const handleOpenRevenueDialog = (event: CustomEvent) => {
       const { contactName, contactId } = event.detail;
-      console.log('=== useRevenueDialog received internal event ===', { contactName, contactId });
       openDialog(contactName, contactId);
     };
 
-    console.log('=== useRevenueDialog setting up event listener ===');
     window.addEventListener('openRevenueDialogInternal', handleOpenRevenueDialog as EventListener);
     
     return () => {
-      console.log('=== useRevenueDialog removing event listener ===');
       window.removeEventListener('openRevenueDialogInternal', handleOpenRevenueDialog as EventListener);
     };
   }, [openDialog]);
@@ -98,93 +85,146 @@ export function useRevenueDialog() {
       return false;
     }
     
+    const isEditing = !!dialogState.currentRevenue;
+    
     try {
       const challengeDay = await getCurrentChallengeDay();
       
-      // Log to 75 Hard app
-      await logOutreachActivity('warm', 1, notes, challengeDay);
-      
-      // Create user metrics payload - only include contact_id if valid
-      const userMetricsPayload = {
-        user_id: user.id,
-        metric_name: 'event_value',
-        metric_type: 'currency',
-        value: revenue,
-        unit: 'USD',
-        challenge_day: challengeDay,
-        notes: `Revenue from ${dialogState.contactName}: ${notes || ''}`,
-        ...(dialogState.contactId && dialogState.contactId.trim() !== '' && { contact_id: dialogState.contactId })
-      };
-      
-      // Log revenue metric
-      const { error } = await supabase
-        .from('user_metrics')
-        .insert(userMetricsPayload);
+      // Update contact's revenue amount
+      // Update contact status only (trigger will handle revenue_amount automatically)
+      if (revenueType === 'direct') {
+        const { error: contactUpdateError } = await supabase
+          .from('contacts')
+          .update({ status: 'won' })
+          .eq('id', dialogState.contactId)
+          .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error inserting user metrics:', error);
-        throw error;
+        if (contactUpdateError) {
+          console.error('❌ [Revenue] Error updating contact status:', contactUpdateError);
+          throw contactUpdateError;
+        }
       }
 
-      // Log booked events metric
-      await supabase
-        .from('user_metrics')
-        .insert({
-          user_id: user.id,
-          metric_name: 'booked_events',
-          metric_type: 'count',
-          value: 1,
-          unit: 'events',
-          challenge_day: challengeDay,
-          notes: `Event booked: ${dialogState.contactName}`
-        });
+      console.log('✅ [Revenue] Contact status updated');
 
-      // Update contact's total revenue amount using lifetime value calculation
-      const contactLifetimeValue = await getContactLifetimeValue(dialogState.contactId);
+      // Handle activity and user_metrics based on edit mode
+      let activityId = dialogState.currentRevenue?.id;
       
-      // For direct revenue, mark contact as "won" and update revenue
-      // For referral revenue, only update revenue amount
-      const contactUpdate = revenueType === 'direct' 
-        ? { revenue_amount: contactLifetimeValue, status: 'won' }
-        : { revenue_amount: contactLifetimeValue };
+      if (isEditing && activityId) {
+        // EDITING MODE: Update activity and user_metrics directly
+        await supabase
+          .from('activities')
+          .update({
+            title: `Revenue Logged: $${revenue.toLocaleString()}`,
+            description: notes || `${revenueType === 'direct' ? 'Direct' : 'Referral'} revenue logged`,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', activityId)
+          .eq('user_id', user.id);
+
+        // Update user_metrics entry (trigger will auto-recalculate revenue_amount)
+        await supabase
+          .from('user_metrics')
+          .update({
+            value: revenue,
+            metric_type: revenueType === 'direct' ? 'direct_revenue' : 'referral_revenue',
+            notes: `Revenue from ${dialogState.contactName}: ${notes || ''}`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('activity_id', activityId)
+          .eq('user_id', user.id)
+          .eq('metric_name', 'event_value');
+          
+        console.log('✅ [Revenue] Updated activity and metrics (trigger will recalculate total)');
+      } else {
+        // NEW ENTRY MODE: Create activity and log to 75 Hard app
+        await logOutreachActivity('warm', 1, notes, challengeDay);
         
-      const { error: contactUpdateError } = await supabase
-        .from('contacts')
-        .update(contactUpdate)
-        .eq('id', dialogState.contactId)
-        .eq('user_id', user.id);
+        const activityTitle = revenueType === 'direct' 
+          ? `Revenue Logged: $${revenue.toLocaleString()}` 
+          : `Referral Revenue Logged: $${revenue.toLocaleString()}`;
+          
+        const activityDescription = revenueType === 'direct'
+          ? notes || `Event revenue of $${revenue.toLocaleString()} logged for ${dialogState.contactName}`
+          : notes || `Referral revenue of $${revenue.toLocaleString()} generated through ${dialogState.contactName}${referredClient ? ` for client: ${referredClient}` : ''}`;
 
-      if (contactUpdateError) {
-        console.error('Error updating contact:', contactUpdateError);
-        throw contactUpdateError;
-      }
+        const { data: newActivity, error: activityError } = await supabase
+          .from('activities')
+          .insert({
+            user_id: user.id,
+            contact_id: dialogState.contactId,
+            type: 'revenue',
+            title: activityTitle,
+            description: activityDescription,
+            response_received: false,
+            completed_at: new Date().toISOString(),
+            scheduled_for: null
+          })
+          .select()
+          .single();
 
-      // Create activity record for revenue logging
-      const activityTitle = revenueType === 'direct' 
-        ? `Revenue Logged: $${revenue.toLocaleString()}` 
-        : `Referral Revenue Logged: $${revenue.toLocaleString()}`;
+        if (activityError) {
+          console.error('❌ [Revenue] Error creating activity:', activityError);
+          throw activityError;
+        }
+
+        activityId = newActivity.id;
+        console.log('✅ [Revenue] Activity created successfully');
         
-      const activityDescription = revenueType === 'direct'
-        ? notes || `Event revenue of $${revenue.toLocaleString()} logged for ${dialogState.contactName}`
-        : notes || `Referral revenue of $${revenue.toLocaleString()} generated through ${dialogState.contactName}${referredClient ? ` for client: ${referredClient}` : ''}`;
+        // Insert user_metrics for new entry (trigger will auto-calculate revenue_amount)
+        const { error: metricsError } = await supabase
+          .from('user_metrics')
+          .insert({
+            user_id: user.id,
+            metric_name: 'event_value',
+            metric_type: revenueType === 'direct' ? 'direct_revenue' : 'referral_revenue',
+            value: revenue,
+            unit: 'USD',
+            challenge_day: challengeDay,
+            contact_id: dialogState.contactId,
+            activity_id: activityId,
+            notes: `Revenue from ${dialogState.contactName}: ${notes || ''}`
+          });
 
-      const { error: activityError } = await supabase
-        .from('activities')
-        .insert({
-          user_id: user.id,
-          contact_id: dialogState.contactId,
-          type: 'revenue',
-          title: activityTitle,
-          description: activityDescription,
-          response_received: false,
-          completed_at: new Date().toISOString(),
-          scheduled_for: null // Explicitly set to null to ensure it's not scheduled
-        });
+        if (metricsError) {
+          console.error('Error inserting user metrics:', metricsError);
+          throw metricsError;
+        }
 
-      if (activityError) {
-        console.error('Error creating activity:', activityError);
-        throw activityError;
+        // Log booked events metric (only for new entries)
+        await supabase
+          .from('user_metrics')
+          .insert({
+            user_id: user.id,
+            metric_name: 'booked_events',
+            metric_type: 'count',
+            value: 1,
+            unit: 'events',
+            challenge_day: challengeDay,
+            notes: `Event booked: ${dialogState.contactName}`
+          });
       }
+        
+      console.log('✅ [Revenue] Metrics saved successfully');
+
+      // Small delay to ensure all database writes are committed
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // Force immediate invalidation of ALL related queries for comprehensive UI update
+      console.log('🔄 [Revenue] Invalidating all related queries');
+      queryClient.invalidateQueries({ 
+        queryKey: ['crmData']  // Invalidate ALL crmData queries
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['contact-revenue'] // Invalidate ALL contact revenue
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['pointsSummary'] // Update points display
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['challengeGoals'] // Update challenge goals
+      });
+      console.log('✅ [Revenue] All queries invalidated - UI will refresh');
 
       // Trigger gamification events
       await triggerGamificationEvent('contact_won', {
@@ -229,7 +269,7 @@ export function useRevenueDialog() {
 
       toast({
         title: dialogState.currentRevenue ? "Revenue Updated! 🎉" : "Revenue Logged! 🎉",
-        description: `$${revenue.toLocaleString()} revenue tracked${isChallengeParticipant ? ' and synced to 75 Hard app' : ''}`,
+        description: `$${revenue.toLocaleString()} ${isEditing ? 'updated' : 'logged'} for ${dialogState.contactName}.`,
       });
 
       // Trigger data refresh across the app

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -40,12 +41,16 @@ import {
   Search,
   Globe,
   Eye,
-  Loader2
+  Loader2,
+  Calendar,
+  Edit,
+  Check
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusinessProfile } from '@/hooks/useBusinessProfile';
+import { useAccess } from '@/hooks/useAccess';
 import { AIQuotaCard } from '@/components/AIQuotaCard';
 import { TokenBreakdownCard } from '@/components/TokenBreakdownCard';
 import { ContactCategory, OutreachRequest, Contact } from '@/types/crm';
@@ -53,6 +58,9 @@ import { useContactCategories } from '@/hooks/useContactCategories';
 import { useContactResearchWithQuota } from '@/hooks/useContactResearchWithQuota';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCRMData } from '@/hooks/useCRMData';
+import { useContactContexts } from '@/hooks/useContactContexts';
+import { useEnhancedRelationshipTypes } from '@/hooks/useEnhancedRelationshipTypes';
+import { useCampaigns, useLogCampaignOutreach } from '@/hooks/useCampaigns';
 
 const CONTACT_CATEGORIES: { value: ContactCategory; label: string; description: string; icon: React.ElementType }[] = [
   { value: 'corporate_planner', label: 'Corporate Planner', description: 'Fill calendar, protect property, enhance guest experience', icon: Users },
@@ -339,12 +347,20 @@ const WebResearchSection: React.FC<{
 export default function AIOutreach() {
   const [generating, setGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
+  const [editedContent, setEditedContent] = useState<GeneratedContent | null>(null);
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [isEditingEmailSubject, setIsEditingEmailSubject] = useState(false);
+  const [isEditingLinkedIn, setIsEditingLinkedIn] = useState(false);
+  const [isEditingSocial, setIsEditingSocial] = useState(false);
+  const [isEditingCall, setIsEditingCall] = useState(false);
   const [showBusinessProfile, setShowBusinessProfile] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [loadingContact, setLoadingContact] = useState(false);
   const [enableResearch, setEnableResearch] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('none');
+  const [overrideCampaignSettings, setOverrideCampaignSettings] = useState(false);
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -352,6 +368,13 @@ export default function AIOutreach() {
   const location = useLocation();
   const { saveContact, saveActivity } = useCRMData();
   const { categories } = useContactCategories();
+  const { contexts } = useContactContexts();
+  const { relationshipTypes } = useEnhancedRelationshipTypes();
+  const { activeCampaigns } = useCampaigns();
+  const logCampaignOutreach = useLogCampaignOutreach();
+  
+  // Import useAccess to get canWrite for access validation
+  const { canWrite } = useAccess();
 
   // Add research hook for access in main component
   const { 
@@ -366,7 +389,7 @@ export default function AIOutreach() {
   const form = useForm<OutreachRequest>({
     defaultValues: {
       outreachType: 'cold',
-      segment: 'other', // Changed from 'venue' to 'other' as default
+      segment: 'other',
       goals: '',
       tone: 'professional',
       psychologicalLevers: [],
@@ -379,6 +402,9 @@ export default function AIOutreach() {
       contactName: '',
       offerIncentive: '',
       callToAction: '',
+      contactSpecificGoal: '',
+      coreDesire: 'not_sure',
+      coreFear: 'not_sure',
     },
   });
 
@@ -411,6 +437,7 @@ export default function AIOutreach() {
     const channel = urlParams.get('channel') as 'email' | 'linkedin' | null;
     const autostart = urlParams.get('autostart') === '1';
     const showProfile = urlParams.get('profile') === '1';
+    const campaignId = urlParams.get('campaignId');
 
     // Only load contact if we have both contactId and user, and haven't loaded this contact yet
     if (contactId && user && (!selectedContact || selectedContact.id !== contactId)) {
@@ -420,7 +447,40 @@ export default function AIOutreach() {
     if (showProfile) {
       setShowBusinessProfile(true);
     }
-  }, [location.search, user, selectedContact]);
+
+    if (campaignId && campaignId !== selectedCampaignId) {
+      setSelectedCampaignId(campaignId);
+    }
+  }, [location.search, user, selectedContact, selectedCampaignId]);
+
+  // Auto-populate form from campaign data when campaign is selected
+  useEffect(() => {
+    if (selectedCampaignId && selectedCampaignId !== 'none' && activeCampaigns && !overrideCampaignSettings) {
+      const selectedCampaign = activeCampaigns.find(c => c.id === selectedCampaignId);
+      if (selectedCampaign) {
+        // Auto-populate tone if campaign has it (validate it's a valid tone)
+        const validTones = ['professional', 'casual', 'urgent', 'friendly'] as const;
+        if (selectedCampaign.tone && validTones.includes(selectedCampaign.tone as any)) {
+          form.setValue('tone', selectedCampaign.tone as 'professional' | 'casual' | 'urgent' | 'friendly');
+        }
+        
+        // Auto-populate CTA if campaign has it
+        if (selectedCampaign.call_to_action) {
+          form.setValue('callToAction', selectedCampaign.call_to_action);
+        }
+        
+        // Auto-populate segment from first target_segment
+        if (selectedCampaign.target_segments && selectedCampaign.target_segments.length > 0) {
+          form.setValue('segment', selectedCampaign.target_segments[0]);
+        }
+        
+        // Auto-populate goals from campaign_goal
+        if (selectedCampaign.campaign_goal) {
+          form.setValue('goals', selectedCampaign.campaign_goal);
+        }
+      }
+    }
+  }, [selectedCampaignId, activeCampaigns, overrideCampaignSettings, form]);
 
   // Persist URLs back to contact record
   const persistUrls = async (websiteUrl: string, linkedinUrl: string) => {
@@ -532,7 +592,7 @@ export default function AIOutreach() {
               website_url: "https://innovate.io",
               social_media_links: { linkedin: "https://linkedin.com/company/innovate" },
               status: "hot",
-              relationship_type: "past_client",
+              relationship_type: "referral",
               category: "venue",
               source: "Website Contact Form",
               created_at: new Date().toISOString(),
@@ -665,19 +725,82 @@ export default function AIOutreach() {
     }
   };
 
+  // Smart outreach type detection based on multiple factors
+  const determineOutreachType = (contact: Contact): 'cold' | 'warm' | 'follow_up' => {
+    // Priority 1: Check relationship status (new field) or legacy status
+    const status = contact.relationshipStatus || contact.status;
+    
+    // Won/Active clients → Follow-up
+    if (status === 'won' || status === 'current_client' || status === 'active' || 
+        status === 'current_amplifier' || status === 'preferred') {
+      return 'follow_up';
+    }
+    
+    // Hot leads or trusted relationships → Warm
+    if (status === 'hot' || status === 'warm' || status === 'trusted' || status === 'connected') {
+      return 'warm';
+    }
+    
+    // Priority 2: Check relationship intent
+    const relationshipType = contact.relationshipType?.toLowerCase() || '';
+    const relationshipIntent = contact.relationshipIntent;
+    
+    // Business nurture relationships → Warm or Follow-up
+    if (relationshipIntent === 'business_nurture_statuses') {
+      if (status === 'past_client' || status === 'past_donor') {
+        return 'warm'; // Re-engagement
+      }
+      return 'follow_up'; // Active nurture
+    }
+    
+    // Personal relationships → Warm
+    if (relationshipIntent === 'personal_statuses') {
+      return 'warm';
+    }
+    
+    // Priority 3: Check response history
+    if (contact.responseReceived || contact.totalTouchpoints > 3) {
+      return 'warm';
+    }
+    
+    // Priority 4: Analyze relationship type name
+    if (relationshipType.includes('client') || 
+        relationshipType.includes('partner') || 
+        relationshipType.includes('friend') ||
+        relationshipType.includes('circle') ||
+        relationshipType.includes('amplifier')) {
+      return 'warm';
+    }
+    
+    // Priority 5: Cold status explicitly
+    if (status === 'cold' || status === 'new' || status === 'potential' || 
+        status === 'lost_maybe_later' || status === 'lost_not_fit') {
+      return 'cold';
+    }
+    
+    // Default for true cold leads
+    if (relationshipType.includes('lead') || relationshipType.includes('prospect')) {
+      return status === 'cold' ? 'cold' : 'warm';
+    }
+    
+    // Final fallback: warm (safer default for established contacts)
+    return contact.totalTouchpoints > 0 ? 'warm' : 'cold';
+  };
+
   const populateFormFromContact = (contact: Contact, channel: 'email' | 'linkedin' | null) => {
     // Map contact category to segment - keep as category value for form compatibility
     const segment = contact.category || 'other';
     console.log('🏷️ Contact category mapping:', { contactCategory: contact.category, mappedSegment: segment });
     
-    // Determine outreach type based on relationship
-    let outreachType = contact.relationshipType === 'lead' ? 'cold' : 
-                      contact.relationshipType === 'past_client' ? 'warm' : 'follow_up';
-                      
-    // Override for specific relationship types
-    if (contact.relationshipType === 'booked_client' || contact.status === 'won') {
-      outreachType = 'follow_up';
-    }
+    // Use smart detection based on multiple factors
+    const outreachType = determineOutreachType(contact);
+    console.log('🎯 Detected outreach type:', outreachType, {
+      status: contact.relationshipStatus || contact.status,
+      relationshipType: contact.relationshipType,
+      relationshipIntent: contact.relationshipIntent,
+      responseReceived: contact.responseReceived,
+      totalTouchpoints: contact.totalTouchpoints
+    });
     
     // Set channel
     const selectedChannel = channel || 'email';
@@ -693,19 +816,31 @@ export default function AIOutreach() {
       contact.notes && `Notes: ${contact.notes}`,
     ].filter(Boolean).join('\n');
 
-    // Determine tone and goals based on relationship
+    // Determine tone and goals based on detected outreach type
     let tone: 'professional' | 'casual' | 'urgent' | 'friendly' = 'professional';
-    let contextualGoals = `Generate effective outreach for ${contact.name}.`;
+    let contextualGoals = '';
+    const status = contact.relationshipStatus || contact.status;
     
-    if (contact.relationshipType === 'booked_client' || contact.status === 'won') {
-      tone = 'friendly';
-      contextualGoals = `Follow up with current client ${contact.name}. Goal: maintain relationship, explore additional services, gather testimonials, and seek referrals.`;
-    } else if (contact.relationshipType === 'past_client') {
-      tone = 'friendly'; 
-      contextualGoals = `Re-engage with past client ${contact.name}. Goal: reconnect, explore new opportunities, and seek referrals.`;
-    } else if (contact.status === 'warm') {
+    switch (outreachType) {
+      case 'follow_up':
+        tone = 'friendly';
+        contextualGoals = `Follow up with ${contact.name}. Maintain relationship, explore additional opportunities, and seek feedback/referrals.`;
+        break;
+      case 'warm':
+        tone = contact.relationshipIntent === 'personal_statuses' ? 'friendly' : 'professional';
+        contextualGoals = `Continue conversation with ${contact.name}. Build on existing relationship and move toward next steps.`;
+        break;
+      case 'cold':
+      default:
+        tone = 'professional';
+        contextualGoals = `Introduce services to ${contact.name}. Establish credibility and spark interest in next conversation.`;
+        break;
+    }
+    
+    // Add status-specific context
+    if (status === 'hot') {
+      contextualGoals += ' HIGH PRIORITY: Contact is highly engaged and ready to move forward.';
       tone = 'professional';
-      contextualGoals = `Continue conversation with ${contact.name}. Goal: move relationship forward and schedule next meeting.`;
     }
 
     // Suggest psychological levers based on category
@@ -771,12 +906,38 @@ export default function AIOutreach() {
 
     setGenerating(true);
     try {
-    const { data: result, error } = await supabase.functions.invoke('generate-outreach', {
-      body: {
+      // Determine outreach type from contact if available
+      const outreachType = selectedContact ? determineOutreachType(selectedContact) : data.outreachType;
+      
+      // Enhance the request with contact context and relationship data
+      const enhancedData = {
         ...data,
         contactId: selectedContact?.id || null,
-      },
-    });
+        campaignId: selectedCampaignId && selectedCampaignId !== 'none' ? selectedCampaignId : null,
+        contactSpecificGoal: data.contactSpecificGoal || null,
+        // Add relationship status and contexts for enhanced personalization
+        contactRelationshipStatus: selectedContact?.relationshipStatus || selectedContact?.status || null,
+        contactContexts: selectedContact?.id ? 
+          contexts.filter(context => 
+            // This would be populated by a proper context assignment check
+            // For now, we pass all available contexts for the AI to consider
+            context
+          ).map(context => ({
+            name: context.name,
+            label: context.label
+          })) : [],
+        // Enhanced relationship information
+        contactRelationshipType: selectedContact?.relationshipType || null,
+        contactRelationshipIntent: selectedContact?.relationshipIntent || null,
+        relationshipTypeData: selectedContact?.relationshipType ? 
+          relationshipTypes.find(rt => rt.name === selectedContact.relationshipType) : null,
+        contactName: selectedContact?.name || null,
+        outreachType: outreachType, // Pass the detected outreach type
+      };
+
+      const { data: result, error } = await supabase.functions.invoke('generate-outreach', {
+        body: enhancedData,
+      });
 
       if (error) {
         console.error('Supabase function error:', error);
@@ -788,6 +949,29 @@ export default function AIOutreach() {
       }
 
       setGeneratedContent(result);
+      // Reset edited content and editing states when new content is generated
+      setEditedContent(null);
+      setIsEditingEmail(false);
+      setIsEditingEmailSubject(false);
+      setIsEditingLinkedIn(false);
+      setIsEditingSocial(false);
+      setIsEditingCall(false);
+      
+      // Log to campaign if campaign is selected
+      if (selectedCampaignId && selectedCampaignId !== 'none' && selectedContact?.id) {
+        try {
+          await logCampaignOutreach.mutateAsync({
+            campaignId: selectedCampaignId,
+            contactId: selectedContact.id,
+            channel: data.channel,
+            aiTokensUsed: result.tokensUsed || 0,
+            contactSpecificGoal: data.contactSpecificGoal || null,
+          });
+        } catch (error) {
+          console.error('Failed to log campaign outreach:', error);
+          // Don't block the user flow if campaign logging fails
+        }
+      }
       
       // Enhanced success message with research indicator
       const researchUsed = enableResearch && research?.status === 'completed';
@@ -834,6 +1018,9 @@ export default function AIOutreach() {
       });
     }
   };
+
+  // Helper function to get active content (edited or original)
+  const getActiveContent = () => editedContent || generatedContent;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -882,7 +1069,13 @@ export default function AIOutreach() {
   const logOutreach = async (channel: 'email' | 'linkedin' | 'social' | 'call', content: string) => {
     if (!user?.id) {
       console.warn('No user ID available for logging outreach');
-      return false;
+      return { success: false, error: 'No user ID available' };
+    }
+
+    // Phase 2A: Check access before attempting to log
+    if (!canWrite) {
+      console.error('🔒 [logOutreach] BLOCKED - No write access');
+      return { success: false, error: 'You need an active subscription to log touchpoints' };
     }
 
     try {
@@ -958,20 +1151,26 @@ export default function AIOutreach() {
             type: activityType,
             title: `${channel.charAt(0).toUpperCase() + channel.slice(1)} outreach sent`,
             description: `Sent ${outreachType} outreach via ${channel}${selectedContact.name ? ` to ${selectedContact.name}` : ''}`,
+            messageContent: content,
             responseReceived: false,
             createdAt: new Date(),
             completedAt: new Date()
           });
+          
+          console.log('✅ [logOutreach] Activity logged successfully via saveActivity');
         } catch (err) {
-          console.error('Error creating activity via saveActivity:', err);
-          // Don't fail the metrics logging if activity creation fails
+          // Phase 2B: Propagate errors instead of swallowing them
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error creating activity';
+          console.error('❌ [logOutreach] Error creating activity via saveActivity:', err);
+          return { success: false, error: errorMessage };
         }
       }
 
-      return true;
+      return { success: true };
     } catch (error) {
-      console.error('Error logging outreach:', error);
-      return false;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error logging outreach';
+      console.error('❌ [logOutreach] Error logging outreach:', error);
+      return { success: false, error: errorMessage };
     }
   };
 
@@ -981,18 +1180,20 @@ export default function AIOutreach() {
       await navigator.clipboard.writeText(content);
       
       // Then log the outreach
-      const logged = await logOutreach(channel, content);
+      const result = await logOutreach(channel, content);
       
-      if (logged) {
+      // Phase 2C: Fix toast logic to properly handle failures
+      if (result.success) {
         toast({
           title: `${type} copied & outreach logged!`,
           description: `Copied to clipboard and logged as sent ${channel} outreach.`,
         });
       } else {
+        // Show descriptive error when logging fails
         toast({
-          title: `${type} copied`,
-          description: "Copied to clipboard, but outreach logging failed. You can manually log this later.",
-          variant: "default",
+          title: `${type} copied, but logging failed`,
+          description: result.error || "Unable to log outreach. Please check your subscription status or try again later.",
+          variant: "destructive",
         });
       }
     } catch (error) {
@@ -1192,11 +1393,20 @@ export default function AIOutreach() {
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
               <div>
                 <p className="font-medium">Generating outreach for:</p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedContact.name}
-                  {selectedContact.company && ` • ${selectedContact.company}`}
-                  {selectedContact.position && ` • ${selectedContact.position}`}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedContact.name}
+                    {selectedContact.company && ` • ${selectedContact.company}`}
+                    {selectedContact.position && ` • ${selectedContact.position}`}
+                  </p>
+                  <Badge variant={
+                    determineOutreachType(selectedContact) === 'cold' ? 'secondary' : 
+                    determineOutreachType(selectedContact) === 'warm' ? 'default' : 'outline'
+                  } className="ml-2">
+                    {determineOutreachType(selectedContact) === 'cold' ? '❄️ Cold Outreach' : 
+                     determineOutreachType(selectedContact) === 'warm' ? '🤝 Warm Outreach' : '✅ Follow-up'}
+                  </Badge>
+                </div>
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={clearContact}>
@@ -1272,18 +1482,29 @@ export default function AIOutreach() {
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-4 animate-fade-in">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-muted-foreground">Form Completion</span>
-            <span className="text-sm font-medium text-primary">{progress}%</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
+        {/* Status Indicators - Side by Side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 animate-fade-in">
+          {/* Form Completion Progress */}
+          <Card className="border-blue-200 bg-blue-50/30">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-900">Form Progress</span>
+                <span className="text-sm font-semibold text-blue-600">{progress}%</span>
+              </div>
+              <Progress 
+                value={progress} 
+                className="h-2 bg-blue-100 [&>div]:bg-blue-500"
+              />
+              <p className="text-xs text-blue-700 mt-2">
+                {progress === 100 ? '✓ Ready to generate' : 'Complete required fields'}
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* AI Usage - Full Width Header */}
-        <div className="mb-6">
-          <AIQuotaCard />
+          {/* AI Usage Quota */}
+          <div className="flex items-stretch">
+            <AIQuotaCard />
+          </div>
         </div>
 
         {/* Form */}
@@ -1322,7 +1543,7 @@ export default function AIOutreach() {
                             <Input
                               {...field}
                               placeholder="Enter the contact's name for personalized messaging..."
-                              className="h-12 focus:ring-2 focus:ring-primary/20 transition-all"
+                              className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                             />
                           </FormControl>
                           <FormDescription>
@@ -1333,6 +1554,97 @@ export default function AIOutreach() {
                       )}
                     />
                     
+                    {/* Campaign Initiative Field */}
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        Campaign Initiative (Optional)
+                      </FormLabel>
+                      <Select onValueChange={setSelectedCampaignId} value={selectedCampaignId}>
+                        <FormControl>
+                          <SelectTrigger className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all">
+                            <SelectValue placeholder="No campaign (general outreach)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-popover/95 backdrop-blur-sm border shadow-elevated z-50">
+                          <SelectItem value="none">No Campaign</SelectItem>
+                          {activeCampaigns?.map((campaign) => (
+                            <SelectItem key={campaign.id} value={campaign.id}>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                <span>{campaign.name}</span>
+                                {campaign.event_date && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({format(new Date(campaign.event_date), 'MMM d, yyyy')})
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Select a campaign to include its context in AI generation
+                      </FormDescription>
+                    </FormItem>
+
+                    {/* Contact-Specific Goal Field (shown when campaign is selected) */}
+                    {selectedCampaignId && selectedCampaignId !== 'none' && (
+                      <FormField
+                        control={form.control}
+                        name="contactSpecificGoal"
+                        render={({ field }) => (
+                          <FormItem className="animate-fade-in">
+                            <FormLabel>Goal for {selectedContact?.name || 'this contact'}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="e.g., Attend the conference, Sponsor at Gold tier, Refer other bar operators"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              What specific action do you want this contact to take? (This will tailor the AI-generated copy)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                      )}
+                    />
+                    )}
+
+                    {/* Campaign Context Banner */}
+                    {selectedCampaignId && selectedCampaignId !== 'none' && activeCampaigns && (
+                      <Card className="bg-primary/5 border-primary/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 flex-1">
+                              <Calendar className="w-5 h-5 text-primary mt-0.5" />
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-foreground">
+                                  {activeCampaigns.find(c => c.id === selectedCampaignId)?.name}
+                                </h4>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {activeCampaigns.find(c => c.id === selectedCampaignId)?.campaign_goal}
+                                </p>
+                                {activeCampaigns.find(c => c.id === selectedCampaignId)?.event_date && (
+                                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {format(new Date(activeCampaigns.find(c => c.id === selectedCampaignId)!.event_date!), 'MMMM d, yyyy')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">Override settings</span>
+                              <Switch 
+                                checked={overrideCampaignSettings}
+                                onCheckedChange={setOverrideCampaignSettings}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -1342,7 +1654,7 @@ export default function AIOutreach() {
                             <FormLabel>Outreach Type</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
-                                <SelectTrigger className="h-12 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
+                                <SelectTrigger className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
                                   <SelectValue />
                                 </SelectTrigger>
                               </FormControl>
@@ -1392,7 +1704,7 @@ export default function AIOutreach() {
                             <FormLabel>Channel</FormLabel>
                              <Select onValueChange={field.onChange} value={field.value}>
                                <FormControl>
-                                 <SelectTrigger className="h-12 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
+                                 <SelectTrigger className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
                                    <SelectValue />
                                  </SelectTrigger>
                                </FormControl>
@@ -1441,10 +1753,21 @@ export default function AIOutreach() {
                         name="segment"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Target Segment</FormLabel>
-                             <Select onValueChange={field.onChange} value={field.value}>
+                            <FormLabel className="flex items-center gap-2">
+                              Target Segment
+                              {selectedCampaignId !== 'none' && !overrideCampaignSettings && (
+                                <Badge variant="secondary" className="text-xs">
+                                  From campaign
+                                </Badge>
+                              )}
+                            </FormLabel>
+                             <Select 
+                               onValueChange={field.onChange} 
+                               value={field.value}
+                               disabled={selectedCampaignId !== 'none' && !overrideCampaignSettings}
+                             >
                                <FormControl>
-                                 <SelectTrigger className="h-12 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
+                                 <SelectTrigger className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
                                    <SelectValue />
                                  </SelectTrigger>
                                </FormControl>
@@ -1474,6 +1797,12 @@ export default function AIOutreach() {
                                  </p>
                                </div>
                              )}
+                             {selectedCampaignId !== 'none' && !overrideCampaignSettings && (
+                               <FormDescription className="text-primary/80 flex items-center gap-1">
+                                 <CheckCircle className="w-3 h-3" />
+                                 Using segment from campaign settings
+                               </FormDescription>
+                             )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1484,18 +1813,33 @@ export default function AIOutreach() {
                         name="goals"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Specific Goals</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                              Specific Goals
+                              {selectedCampaignId !== 'none' && !overrideCampaignSettings && (
+                                <Badge variant="secondary" className="text-xs">
+                                  From campaign
+                                </Badge>
+                              )}
+                            </FormLabel>
                             <FormControl>
                               <Textarea 
                                 placeholder="e.g., Book holiday parties, get referrals, schedule discovery calls..."
-                                className="min-h-[100px] focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                                className="min-h-[100px] border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all resize-none"
                                 tabIndex={0}
+                                disabled={selectedCampaignId !== 'none' && !overrideCampaignSettings}
                                 {...field} 
                               />
                             </FormControl>
-                            <FormDescription>
-                              What specific outcomes do you want from this outreach?
-                            </FormDescription>
+                            {selectedCampaignId !== 'none' && !overrideCampaignSettings ? (
+                              <FormDescription className="text-primary/80 flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" />
+                                Using goals from campaign settings
+                              </FormDescription>
+                            ) : (
+                              <FormDescription>
+                                What specific outcomes do you want from this outreach?
+                              </FormDescription>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1516,10 +1860,21 @@ export default function AIOutreach() {
                         name="tone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Tone</FormLabel>
-                             <Select onValueChange={field.onChange} value={field.value}>
+                            <FormLabel className="flex items-center gap-2">
+                              Tone
+                              {selectedCampaignId !== 'none' && !overrideCampaignSettings && (
+                                <Badge variant="secondary" className="text-xs">
+                                  From campaign
+                                </Badge>
+                              )}
+                            </FormLabel>
+                             <Select 
+                               onValueChange={field.onChange} 
+                               value={field.value}
+                               disabled={selectedCampaignId !== 'none' && !overrideCampaignSettings}
+                             >
                                <FormControl>
-                                 <SelectTrigger className="h-12 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
+                                 <SelectTrigger className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
                                    <SelectValue />
                                  </SelectTrigger>
                                </FormControl>
@@ -1530,6 +1885,12 @@ export default function AIOutreach() {
                                  <SelectItem value="friendly">🤝 Friendly</SelectItem>
                                </SelectContent>
                              </Select>
+                             {selectedCampaignId !== 'none' && !overrideCampaignSettings && (
+                               <FormDescription className="text-primary/80 flex items-center gap-1">
+                                 <CheckCircle className="w-3 h-3" />
+                                 Using tone from campaign
+                               </FormDescription>
+                             )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1543,7 +1904,7 @@ export default function AIOutreach() {
                             <FormLabel>Length</FormLabel>
                              <Select onValueChange={field.onChange} value={field.value}>
                                <FormControl>
-                                 <SelectTrigger className="h-12 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
+                                 <SelectTrigger className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
                                    <SelectValue />
                                  </SelectTrigger>
                                </FormControl>
@@ -1558,6 +1919,74 @@ export default function AIOutreach() {
                         )}
                       />
                     </div>
+
+                    {/* Buyer Motivation Card */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          🎯 Buyer Motivation
+                          <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          If you know what drives this person or what concerns them, we can tailor the message to resonate better.
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="coreDesire"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>What does this person want most?</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select their primary goal..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="not_sure">Not sure (appeal to all motivations)</SelectItem>
+                                  <SelectItem value="breakthrough">🚀 Break through to the next level</SelectItem>
+                                  <SelectItem value="relationships">🤝 Build strong relationships and partnerships</SelectItem>
+                                  <SelectItem value="informed_decisions">📊 Make informed, confident decisions</SelectItem>
+                                  <SelectItem value="achieve_goals">🎯 Achieve specific goals and targets</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                This helps us emphasize the right benefits and outcomes.
+                              </FormDescription>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="coreFear"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>What concern keeps them up at night?</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select their primary concern..." />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="not_sure">Not sure (address all concerns)</SelectItem>
+                                  <SelectItem value="plateauing">📉 Getting stuck or plateauing</SelectItem>
+                                  <SelectItem value="missing_connections">🔌 Missing out on key connections</SelectItem>
+                                  <SelectItem value="wrong_choice">⚠️ Choosing the wrong option</SelectItem>
+                                  <SelectItem value="wasting_time">⏱️ Wasting time or falling short</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                This helps us address the right pain points and objections.
+                              </FormDescription>
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                    </Card>
                   </div>
 
                   {/* Call to Action */}
@@ -1572,10 +2001,21 @@ export default function AIOutreach() {
                       name="callToAction"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Preferred CTA (Optional)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || "ai_choose"}>
+                          <FormLabel className="flex items-center gap-2">
+                            Preferred CTA (Optional)
+                            {selectedCampaignId !== 'none' && !overrideCampaignSettings && (
+                              <Badge variant="secondary" className="text-xs">
+                                From campaign
+                              </Badge>
+                            )}
+                          </FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || "ai_choose"}
+                            disabled={selectedCampaignId !== 'none' && !overrideCampaignSettings}
+                          >
                             <FormControl>
-                              <SelectTrigger className="h-12 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
+                              <SelectTrigger className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all" tabIndex={0}>
                                 <SelectValue placeholder="Let AI choose the best CTA" />
                               </SelectTrigger>
                             </FormControl>
@@ -1593,9 +2033,16 @@ export default function AIOutreach() {
                               <SelectItem value="custom">✏️ Custom (AI will adapt)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <FormDescription>
-                            Choose a specific call to action or let the AI select the best one
-                          </FormDescription>
+                          {selectedCampaignId !== 'none' && !overrideCampaignSettings ? (
+                            <FormDescription className="text-primary/80 flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" />
+                              Using call to action from campaign
+                            </FormDescription>
+                          ) : (
+                            <FormDescription>
+                              Choose a specific call to action or let the AI select the best one
+                            </FormDescription>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1698,7 +2145,7 @@ export default function AIOutreach() {
                                    type="number" 
                                    min="1" 
                                    max="10"
-                                   className="h-12 focus:ring-2 focus:ring-primary/20 transition-all"
+                                   className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                                    tabIndex={0}
                                   {...field}
                                   onChange={(e) => field.onChange(parseInt(e.target.value))}
@@ -1744,7 +2191,7 @@ export default function AIOutreach() {
                             <FormControl>
                               <Textarea 
                                 placeholder="e.g., Recent Instagram post about event planning, mentioned needing bar services, saw their venue featured in Style Weekly..."
-                                className="min-h-[80px] focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                                className="min-h-[80px] border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all resize-none"
                                 tabIndex={0}
                                 {...field} 
                               />
@@ -1766,7 +2213,7 @@ export default function AIOutreach() {
                              <FormControl>
                                 <Input 
                                   placeholder="e.g., 10% off holiday bookings, free tasting for events over 50 people..."
-                                  className="h-12 focus:ring-2 focus:ring-primary/20 transition-all"
+                                  className="h-12 border-2 border-input/60 bg-background/80 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                                   tabIndex={0}
                                   {...field} 
                                 />
@@ -1894,21 +2341,58 @@ export default function AIOutreach() {
                           <label className="text-sm font-medium flex items-center gap-2">
                             <Mail className="w-4 h-4" />
                             Subject Line
+                            {editedContent && editedContent.subjectLine !== generatedContent?.subjectLine && (
+                              <Badge variant="secondary" className="ml-2">
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edited
+                              </Badge>
+                            )}
                           </label>
                           <div className="flex gap-2">
+                            {!isEditingEmailSubject && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingEmailSubject(true)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {isEditingEmailSubject && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingEmailSubject(false)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => copyToClipboard(generatedContent.subjectLine, "Subject line")}
+                              onClick={() => copyToClipboard(getActiveContent()?.subjectLine || '', "Subject line")}
                               className="hover:bg-muted/50 transition-colors"
                             >
                               <Copy className="w-3 h-3" />
                             </Button>
                           </div>
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg border">
-                          <p className="text-sm font-medium">{generatedContent.subjectLine}</p>
-                        </div>
+                        {isEditingEmailSubject ? (
+                          <Input
+                            value={editedContent?.subjectLine || generatedContent?.subjectLine || ''}
+                            onChange={(e) => setEditedContent(prev => ({
+                              ...(prev || generatedContent!),
+                              subjectLine: e.target.value
+                            }))}
+                            className="font-medium"
+                          />
+                        ) : (
+                          <div className="p-4 bg-muted/30 rounded-lg border">
+                            <p className="text-sm font-medium">{getActiveContent()?.subjectLine}</p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-3">
@@ -1916,12 +2400,38 @@ export default function AIOutreach() {
                           <label className="text-sm font-medium flex items-center gap-2">
                             <FileText className="w-4 h-4" />
                             Email Body
+                            {editedContent && editedContent.emailBody !== generatedContent?.emailBody && (
+                              <Badge variant="secondary" className="ml-2">
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edited
+                              </Badge>
+                            )}
                           </label>
                           <div className="flex gap-2">
+                            {!isEditingEmail && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingEmail(true)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {isEditingEmail && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingEmail(false)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => copyToClipboard(generatedContent.emailBody, "Email body")}
+                              onClick={() => copyToClipboard(getActiveContent()?.emailBody || '', "Email body")}
                               className="hover:bg-muted/50 transition-colors"
                             >
                               <Copy className="w-3 h-3" />
@@ -1930,8 +2440,9 @@ export default function AIOutreach() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                const subject = encodeURIComponent(generatedContent.subjectLine);
-                                const body = encodeURIComponent(generatedContent.emailBody);
+                                const activeContent = getActiveContent();
+                                const subject = encodeURIComponent(activeContent?.subjectLine || '');
+                                const body = encodeURIComponent(activeContent?.emailBody || '');
                                 const email = selectedContact?.email || '';
                                 const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
                                 window.open(mailtoLink, '_blank');
@@ -1944,11 +2455,14 @@ export default function AIOutreach() {
                             <Button
                               size="sm"
                               variant="default"
-                              onClick={() => copyAndLogOutreach(
-                                `${generatedContent.subjectLine}\n\n${generatedContent.emailBody}`, 
-                                "Email", 
-                                "email"
-                              )}
+                              onClick={() => {
+                                const activeContent = getActiveContent();
+                                copyAndLogOutreach(
+                                  `${activeContent?.subjectLine || ''}\n\n${activeContent?.emailBody || ''}`, 
+                                  "Email", 
+                                  "email"
+                                );
+                              }}
                               className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                               <Copy className="w-3 h-3 mr-1" />
@@ -1956,11 +2470,22 @@ export default function AIOutreach() {
                             </Button>
                           </div>
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
-                          <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
-                            {generatedContent.emailBody}
-                          </pre>
-                        </div>
+                        {isEditingEmail ? (
+                          <Textarea
+                            value={editedContent?.emailBody || generatedContent?.emailBody || ''}
+                            onChange={(e) => setEditedContent(prev => ({
+                              ...(prev || generatedContent!),
+                              emailBody: e.target.value
+                            }))}
+                            className="min-h-[320px] font-sans"
+                          />
+                        ) : (
+                          <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
+                            <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
+                              {getActiveContent()?.emailBody}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
 
@@ -1970,12 +2495,38 @@ export default function AIOutreach() {
                           <label className="text-sm font-medium flex items-center gap-2">
                             <Linkedin className="w-4 h-4" />
                             LinkedIn Message
+                            {editedContent && editedContent.linkedinMessage !== generatedContent?.linkedinMessage && (
+                              <Badge variant="secondary" className="ml-2">
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edited
+                              </Badge>
+                            )}
                           </label>
                           <div className="flex gap-2">
+                            {!isEditingLinkedIn && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingLinkedIn(true)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {isEditingLinkedIn && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingLinkedIn(false)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => copyToClipboard(generatedContent.linkedinMessage, "LinkedIn message")}
+                              onClick={() => copyToClipboard(getActiveContent()?.linkedinMessage || '', "LinkedIn message")}
                               className="hover:bg-muted/50 transition-colors"
                             >
                               <Copy className="w-3 h-3" />
@@ -2007,7 +2558,10 @@ export default function AIOutreach() {
                             <Button
                               size="sm"
                               variant="default"
-                              onClick={() => copyAndLogOutreach(generatedContent.linkedinMessage, "LinkedIn Message", "linkedin")}
+                              onClick={() => {
+                                const activeContent = getActiveContent();
+                                copyAndLogOutreach(activeContent?.linkedinMessage || '', "LinkedIn Message", "linkedin");
+                              }}
                               className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                               <Copy className="w-3 h-3 mr-1" />
@@ -2015,11 +2569,22 @@ export default function AIOutreach() {
                             </Button>
                           </div>
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
-                          <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
-                            {generatedContent.linkedinMessage}
-                          </pre>
-                        </div>
+                        {isEditingLinkedIn ? (
+                          <Textarea
+                            value={editedContent?.linkedinMessage || generatedContent?.linkedinMessage || ''}
+                            onChange={(e) => setEditedContent(prev => ({
+                              ...(prev || generatedContent!),
+                              linkedinMessage: e.target.value
+                            }))}
+                            className="min-h-[320px] font-sans"
+                          />
+                        ) : (
+                          <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
+                            <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
+                              {getActiveContent()?.linkedinMessage}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
 
@@ -2029,12 +2594,41 @@ export default function AIOutreach() {
                           <label className="text-sm font-medium flex items-center gap-2">
                             <Share2 className="w-4 h-4" />
                             Social Media Post
+                            {editedContent && (editedContent.socialMediaPost || editedContent.linkedinMessage) !== (generatedContent?.socialMediaPost || generatedContent?.linkedinMessage) && (
+                              <Badge variant="secondary" className="ml-2">
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edited
+                              </Badge>
+                            )}
                           </label>
                           <div className="flex gap-2">
+                            {!isEditingSocial && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingSocial(true)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {isEditingSocial && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingSocial(false)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => copyToClipboard(generatedContent.socialMediaPost || generatedContent.linkedinMessage, "Social media post")}
+                              onClick={() => {
+                                const activeContent = getActiveContent();
+                                copyToClipboard(activeContent?.socialMediaPost || activeContent?.linkedinMessage || '', "Social media post");
+                              }}
                               className="hover:bg-muted/50 transition-colors"
                             >
                               <Copy className="w-3 h-3" />
@@ -2042,11 +2636,14 @@ export default function AIOutreach() {
                             <Button
                               size="sm"
                               variant="default"
-                              onClick={() => copyAndLogOutreach(
-                                generatedContent.socialMediaPost || generatedContent.linkedinMessage, 
-                                "Social Media Post", 
-                                "social"
-                              )}
+                              onClick={() => {
+                                const activeContent = getActiveContent();
+                                copyAndLogOutreach(
+                                  activeContent?.socialMediaPost || activeContent?.linkedinMessage || '', 
+                                  "Social Media Post", 
+                                  "social"
+                                );
+                              }}
                               className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                               <Copy className="w-3 h-3 mr-1" />
@@ -2054,11 +2651,22 @@ export default function AIOutreach() {
                             </Button>
                           </div>
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
-                          <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
-                            {generatedContent.socialMediaPost || generatedContent.linkedinMessage}
-                          </pre>
-                        </div>
+                        {isEditingSocial ? (
+                          <Textarea
+                            value={editedContent?.socialMediaPost || editedContent?.linkedinMessage || generatedContent?.socialMediaPost || generatedContent?.linkedinMessage || ''}
+                            onChange={(e) => setEditedContent(prev => ({
+                              ...(prev || generatedContent!),
+                              socialMediaPost: e.target.value
+                            }))}
+                            className="min-h-[320px] font-sans"
+                          />
+                        ) : (
+                          <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
+                            <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
+                              {getActiveContent()?.socialMediaPost || getActiveContent()?.linkedinMessage}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     </TabsContent>
 
@@ -2068,12 +2676,41 @@ export default function AIOutreach() {
                           <label className="text-sm font-medium flex items-center gap-2">
                             <Phone className="w-4 h-4" />
                             Call Script & Talking Points
+                            {editedContent && (editedContent.callScript || editedContent.linkedinMessage) !== (generatedContent?.callScript || generatedContent?.linkedinMessage) && (
+                              <Badge variant="secondary" className="ml-2">
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edited
+                              </Badge>
+                            )}
                           </label>
                           <div className="flex gap-2">
+                            {!isEditingCall && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingCall(true)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                            {isEditingCall && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setIsEditingCall(false)}
+                                className="hover:bg-muted/50 transition-colors"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => copyToClipboard(generatedContent.callScript || generatedContent.linkedinMessage, "Call script")}
+                              onClick={() => {
+                                const activeContent = getActiveContent();
+                                copyToClipboard(activeContent?.callScript || activeContent?.linkedinMessage || '', "Call script");
+                              }}
                               className="hover:bg-muted/50 transition-colors"
                             >
                               <Copy className="w-3 h-3" />
@@ -2081,11 +2718,14 @@ export default function AIOutreach() {
                             <Button
                               size="sm"
                               variant="default"
-                              onClick={() => copyAndLogOutreach(
-                                generatedContent.callScript || generatedContent.linkedinMessage, 
-                                "Call Script", 
-                                "call"
-                              )}
+                              onClick={() => {
+                                const activeContent = getActiveContent();
+                                copyAndLogOutreach(
+                                  activeContent?.callScript || activeContent?.linkedinMessage || '', 
+                                  "Call Script", 
+                                  "call"
+                                );
+                              }}
                               className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                               <Copy className="w-3 h-3 mr-1" />
@@ -2093,30 +2733,47 @@ export default function AIOutreach() {
                             </Button>
                           </div>
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
-                          <div className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
-                            {generatedContent.callScript ? (
-                              <div className="space-y-4">
-                                {generatedContent.callScript.split('\n\n').map((section, index) => {
-                                  if (section.includes('KEY POINTS:') || section.includes('TALKING POINTS:') || section.includes('•')) {
-                                    return (
-                                      <div key={index} className="bg-accent/20 p-3 rounded border-l-4 border-accent">
-                                        <div className="font-medium text-accent-foreground mb-2 flex items-center gap-2">
-                                          <Lightbulb className="w-4 h-4" />
-                                          Key Talking Points
-                                        </div>
-                                        <div className="text-sm">{section}</div>
-                                      </div>
-                                    );
-                                  }
-                                  return <div key={index}>{section}</div>;
-                                })}
-                              </div>
-                            ) : (
-                              generatedContent.linkedinMessage
-                            )}
+                        {isEditingCall ? (
+                          <Textarea
+                            value={editedContent?.callScript || editedContent?.linkedinMessage || generatedContent?.callScript || generatedContent?.linkedinMessage || ''}
+                            onChange={(e) => setEditedContent(prev => ({
+                              ...(prev || generatedContent!),
+                              callScript: e.target.value
+                            }))}
+                            className="min-h-[320px] font-sans"
+                          />
+                        ) : (
+                          <div className="p-4 bg-muted/30 rounded-lg border max-h-80 overflow-y-auto">
+                            <div className="text-sm whitespace-pre-wrap font-sans leading-relaxed">
+                              {(() => {
+                                const activeContent = getActiveContent();
+                                const callScript = activeContent?.callScript || activeContent?.linkedinMessage || '';
+                                
+                                if (activeContent?.callScript) {
+                                  return (
+                                    <div className="space-y-4">
+                                      {callScript.split('\n\n').map((section, index) => {
+                                        if (section.includes('KEY POINTS:') || section.includes('TALKING POINTS:') || section.includes('•')) {
+                                          return (
+                                            <div key={index} className="bg-accent/20 p-3 rounded border-l-4 border-accent">
+                                              <div className="font-medium text-accent-foreground mb-2 flex items-center gap-2">
+                                                <Lightbulb className="w-4 h-4" />
+                                                Key Talking Points
+                                              </div>
+                                              <div className="text-sm">{section}</div>
+                                            </div>
+                                          );
+                                        }
+                                        return <div key={index}>{section}</div>;
+                                      })}
+                                    </div>
+                                  );
+                                }
+                                return callScript;
+                              })()}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </TabsContent>
 

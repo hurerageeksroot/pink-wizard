@@ -70,7 +70,6 @@ const EmailSequenceManagement = () => {
     { value: 'contact_added', label: 'Contact Added' },
     { value: 'no_activity_7_days', label: 'No Activity (7 days)' },
     { value: 'payment_received', label: 'Payment Received' },
-    { value: 'trial_ending', label: 'Trial Ending' },
   ];
 
   useEffect(() => {

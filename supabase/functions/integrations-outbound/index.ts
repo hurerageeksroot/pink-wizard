@@ -31,8 +31,8 @@ serve(async (req) => {
     
     // Hash the token to match stored hash
     const encoder = new TextEncoder();
-    const data = encoder.encode(token);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const encodedData = encoder.encode(token);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const tokenHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
@@ -114,7 +114,7 @@ serve(async (req) => {
       query = query.gte('created_at', since);
     }
 
-    const { data, error } = await query;
+    const { data: queryData, error } = await query;
 
     if (error) {
       console.error('Database query error:', error);
@@ -129,8 +129,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         resource,
-        count: data?.length || 0,
-        data: data || [],
+        count: queryData?.length || 0,
+        data: queryData || [],
         timestamp: new Date().toISOString()
       }),
       { 

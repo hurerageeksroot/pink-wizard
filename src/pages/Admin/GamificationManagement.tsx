@@ -3,16 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trophy, Star, Gift, Edit, Trash2, Package, Settings } from "lucide-react";
+import { Plus, Trophy, Star, Gift, Edit, Trash2, Package, Settings, Zap, Target } from "lucide-react";
 import { BadgeEditor } from "@/components/BadgeEditor";
 import { RewardPackEditor } from "@/components/RewardPackEditor";
 import { GuaranteedRewardEditor } from "@/components/GuaranteedRewardEditor";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { useChallenge } from "@/hooks/useChallenge";
 
 export default function GamificationManagement() {
   const { toast } = useToast();
+  const { currentDay } = useChallenge();
   const [activeTab, setActiveTab] = useState("badges");
   const [editingBadge, setEditingBadge] = useState<any>(null);
   const [editingRewardPack, setEditingRewardPack] = useState<any>(null);
@@ -20,6 +23,7 @@ export default function GamificationManagement() {
   const [showBadgeEditor, setShowBadgeEditor] = useState(false);
   const [showRewardEditor, setShowRewardEditor] = useState(false);
   const [showGuaranteedEditor, setShowGuaranteedEditor] = useState(false);
+  const [awardingBonus, setAwardingBonus] = useState<string | null>(null);
   
   // Data states
   const [badges, setBadges] = useState<any[]>([]);
@@ -108,6 +112,106 @@ export default function GamificationManagement() {
     }
   };
 
+  // Performance bonus queries
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of current week
+  weekStart.setHours(0, 0, 0, 0);
+
+  const { data: outreachCandidates, refetch: refetchOutreach } = useQuery({
+    queryKey: ['weekly-outreach-bonus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_weekly_outreach_bonus_candidates');
+      if (error) throw error;
+      return data as Array<{
+        user_id: string;
+        display_name: string;
+        weekly_activity_count: number;
+        already_awarded: boolean;
+      }>;
+    },
+    enabled: activeTab === 'bonuses'
+  });
+
+  const { data: winsCandidates, refetch: refetchWins } = useQuery({
+    queryKey: ['weekly-wins-bonus'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_weekly_wins_bonus_candidates');
+      if (error) throw error;
+      return data as Array<{
+        user_id: string;
+        display_name: string;
+        weekly_wins: number;
+        already_awarded: boolean;
+      }>;
+    },
+    enabled: activeTab === 'bonuses'
+  });
+
+  const { data: streakCandidates, refetch: refetchStreaks } = useQuery({
+    queryKey: ['streak-bonus-candidates'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_streak_bonus_candidates');
+      if (error) throw error;
+      return data as Array<{
+        user_id: string;
+        display_name: string;
+        current_streak: number;
+        eligible_bonus_type: string;
+        bonus_points: number;
+        last_streak_bonus_awarded: string | null;
+      }>;
+    },
+    enabled: activeTab === 'bonuses'
+  });
+
+  const isLoadingOutreach = !outreachCandidates && activeTab === 'bonuses';
+  const isLoadingWins = !winsCandidates && activeTab === 'bonuses';
+  const isLoadingStreak = !streakCandidates && activeTab === 'bonuses';
+
+  const handleAwardBonus = async (
+    userId: string,
+    displayName: string,
+    activityType: string,
+    points: number,
+    description: string
+  ) => {
+    setAwardingBonus(userId);
+    try {
+      const { error } = await supabase.rpc('award_points', {
+        p_user_id: userId,
+        p_activity_type: activityType,
+        p_points: points,
+        p_description: description,
+        p_metadata: {
+          awarded_by: 'admin',
+          week_start: weekStart.toISOString()
+        },
+        p_challenge_day: currentDay
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Bonus awarded",
+        description: `Successfully awarded ${points} points to ${displayName}`
+      });
+
+      // Refresh all bonus queries
+      refetchOutreach();
+      refetchWins();
+      refetchStreaks();
+    } catch (error) {
+      console.error('Error awarding bonus:', error);
+      toast({
+        title: "Error",
+        description: "Failed to award bonus",
+        variant: "destructive"
+      });
+    } finally {
+      setAwardingBonus(null);
+    }
+  };
+
   // Load all data
   useEffect(() => {
     const loadData = async () => {
@@ -133,7 +237,7 @@ export default function GamificationManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="badges" className="flex items-center gap-2">
             <Trophy className="h-4 w-4" />
             Badges
@@ -145,6 +249,10 @@ export default function GamificationManagement() {
           <TabsTrigger value="guaranteed" className="flex items-center gap-2">
             <Gift className="h-4 w-4" />
             Guaranteed Rewards
+          </TabsTrigger>
+          <TabsTrigger value="bonuses" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Performance Bonuses
           </TabsTrigger>
         </TabsList>
 
@@ -662,6 +770,218 @@ export default function GamificationManagement() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="bonuses" className="space-y-6">
+          <div className="space-y-6">
+            {/* Weekly Outreach Bonus Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Weekly Outreach Bonus (100 pts)
+                </CardTitle>
+                <CardDescription>
+                  Users with 500+ outreach points this week
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingOutreach ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                  </div>
+                ) : outreachCandidates?.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No users qualify this week
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {outreachCandidates?.map((candidate) => (
+                      <div
+                        key={candidate.user_id}
+                        className="flex justify-between items-center p-4 border rounded-lg bg-card"
+                      >
+                        <div>
+                          <p className="font-medium">{candidate.display_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {candidate.weekly_activity_count} outreach points
+                          </p>
+                        </div>
+                        {candidate.already_awarded ? (
+                          <Badge variant="secondary">Already Awarded</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              handleAwardBonus(
+                                candidate.user_id,
+                                candidate.display_name,
+                                'weekly_outreach_bonus',
+                                100,
+                                `Weekly outreach bonus: ${candidate.weekly_activity_count} points`
+                              )
+                            }
+                            disabled={awardingBonus === candidate.user_id}
+                          >
+                            {awardingBonus === candidate.user_id ? (
+                              <>
+                                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                                Awarding...
+                              </>
+                            ) : (
+                              'Award 100 pts'
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Weekly Wins Bonus Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Weekly Wins Bonus (150 pts)
+                </CardTitle>
+                <CardDescription>
+                  Users with 5+ contacts marked as "won" this week
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingWins ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                  </div>
+                ) : winsCandidates?.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No users qualify this week
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {winsCandidates?.map((candidate) => (
+                      <div
+                        key={candidate.user_id}
+                        className="flex justify-between items-center p-4 border rounded-lg bg-card"
+                      >
+                        <div>
+                          <p className="font-medium">{candidate.display_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {candidate.weekly_wins} wins this week
+                          </p>
+                        </div>
+                        {candidate.already_awarded ? (
+                          <Badge variant="secondary">Already Awarded</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              handleAwardBonus(
+                                candidate.user_id,
+                                candidate.display_name,
+                                'weekly_wins_bonus',
+                                150,
+                                `Weekly wins bonus: ${candidate.weekly_wins} wins`
+                              )
+                            }
+                            disabled={awardingBonus === candidate.user_id}
+                          >
+                            {awardingBonus === candidate.user_id ? (
+                              <>
+                                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                                Awarding...
+                              </>
+                            ) : (
+                              'Award 150 pts'
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Streak Bonuses Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Streak Bonuses
+                </CardTitle>
+                <CardDescription>
+                  7+ days: 50 pts | 14+ days: 150 pts | 30+ days: 300 pts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingStreak ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                  </div>
+                ) : streakCandidates?.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No users qualify for streak bonuses
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {streakCandidates?.map((candidate) => {
+                      const hasAwardedThisLevel =
+                        candidate.last_streak_bonus_awarded === candidate.eligible_bonus_type;
+                      
+                      return (
+                        <div
+                          key={candidate.user_id}
+                          className="flex justify-between items-center p-4 border rounded-lg bg-card"
+                        >
+                          <div>
+                            <p className="font-medium">{candidate.display_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {candidate.current_streak} day streak
+                              {candidate.last_streak_bonus_awarded && (
+                                <span className="ml-2 text-xs">
+                                  (Last awarded: {candidate.last_streak_bonus_awarded.replace('streak_bonus_', '')} days)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          {hasAwardedThisLevel ? (
+                            <Badge variant="secondary">Already Awarded</Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                handleAwardBonus(
+                                  candidate.user_id,
+                                  candidate.display_name,
+                                  candidate.eligible_bonus_type,
+                                  candidate.bonus_points,
+                                  `Streak bonus: ${candidate.current_streak} day streak`
+                                )
+                              }
+                              disabled={awardingBonus === candidate.user_id}
+                            >
+                              {awardingBonus === candidate.user_id ? (
+                                <>
+                                  <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                                  Awarding...
+                                </>
+                              ) : (
+                                `Award ${candidate.bonus_points} pts`
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

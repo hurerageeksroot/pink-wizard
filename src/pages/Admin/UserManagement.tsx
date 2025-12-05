@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Trash2, Shield, User, Crown, RotateCcw, Edit, Target, Calendar, TrendingUp, Search } from "lucide-react";
+import { Trash2, Shield, User, Crown, Mail, Edit, Target, Calendar, TrendingUp, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserEditDialog } from "@/components/Admin/UserEditDialog";
 
@@ -51,45 +51,30 @@ export default function UserManagement() {
 
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<{ email: string; name: string } | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [showGeneratedPassword, setShowGeneratedPassword] = useState(false);
-  const [generatedPassword, setGeneratedPassword] = useState('');
 
-  const generateRandomPassword = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-  };
-
-  const handleResetPasswordClick = (userEmail: string, userName: string) => {
+  const handleSendResetEmailClick = (userEmail: string, userName: string) => {
     setResetPasswordUser({ email: userEmail, name: userName });
-    const randomPassword = generateRandomPassword();
-    setNewPassword(randomPassword);
-    setGeneratedPassword(randomPassword);
     setShowPasswordResetDialog(true);
-    setShowGeneratedPassword(false);
   };
 
-  const handleResetPassword = async () => {
-    if (!resetPasswordUser || !newPassword) return;
+  const handleSendResetEmail = async () => {
+    if (!resetPasswordUser) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+      const { data, error } = await supabase.functions.invoke('admin-send-password-reset', {
         body: { 
-          email: resetPasswordUser.email,
-          newPassword: newPassword 
+          email: resetPasswordUser.email
         }
       });
       
       if (error) throw error;
       
-      setShowGeneratedPassword(true);
-      toast.success('Password reset successfully! Please share the new password with the user.');
+      toast.success(`Password reset email sent to ${resetPasswordUser.email}`);
+      setShowPasswordResetDialog(false);
+      setResetPasswordUser(null);
     } catch (error) {
-      toast.error('Failed to reset password');
+      toast.error('Failed to send password reset email');
+      console.error('Password reset error:', error);
     }
   };
 
@@ -365,10 +350,10 @@ export default function UserManagement() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleResetPasswordClick(user.email, user.display_name || 'User')}
-                          title="Reset Password"
+                          onClick={() => handleSendResetEmailClick(user.email, user.display_name || 'User')}
+                          title="Send Password Reset Email"
                         >
-                          <RotateCcw className="h-4 w-4" />
+                          <Mail className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="outline"
@@ -396,58 +381,24 @@ export default function UserManagement() {
       <AlertDialog open={showPasswordResetDialog} onOpenChange={setShowPasswordResetDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reset Password for {resetPasswordUser?.name}</AlertDialogTitle>
+            <AlertDialogTitle>Send Password Reset Email</AlertDialogTitle>
             <AlertDialogDescription>
-              Generate a new password for {resetPasswordUser?.email}. The user will need to use this new password to log in.
+              Send a password reset email to {resetPasswordUser?.email}. The user will receive a secure link to set their own password. The link will be valid for 24 hours.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="new-password" 
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="font-mono"
-                  placeholder="Generated password"
-                />
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    const password = generateRandomPassword();
-                    setNewPassword(password);
-                    setGeneratedPassword(password);
-                  }}
-                >
-                  Generate
-                </Button>
+
+          <div className="p-4 bg-muted rounded-lg">
+            <div className="flex items-start gap-3">
+              <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  Email will be sent to:
+                </p>
+                <p className="text-sm text-muted-foreground font-mono">
+                  {resetPasswordUser?.email}
+                </p>
               </div>
             </div>
-            
-            {showGeneratedPassword && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm font-medium text-green-800 mb-2">
-                  Password reset successfully! Share this password with the user:
-                </p>
-                <div className="flex items-center gap-2">
-                  <code className="px-2 py-1 bg-white border rounded text-sm font-mono">
-                    {generatedPassword}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedPassword);
-                      toast.success('Password copied to clipboard');
-                    }}
-                  >
-                    Copy
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
           <AlertDialogFooter>
@@ -455,20 +406,15 @@ export default function UserManagement() {
               onClick={() => {
                 setShowPasswordResetDialog(false);
                 setResetPasswordUser(null);
-                setNewPassword('');
-                setShowGeneratedPassword(false);
               }}
             >
-              {showGeneratedPassword ? 'Close' : 'Cancel'}
+              Cancel
             </AlertDialogCancel>
-            {!showGeneratedPassword && (
-              <AlertDialogAction 
-                onClick={handleResetPassword}
-                disabled={!newPassword}
-              >
-                Reset Password
-              </AlertDialogAction>
-            )}
+            <AlertDialogAction 
+              onClick={handleSendResetEmail}
+            >
+              Send Reset Email
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

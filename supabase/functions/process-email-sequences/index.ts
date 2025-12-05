@@ -61,7 +61,7 @@ const handler = async (req: Request): Promise<Response> => {
               idempotencyKey: `broadcast-${emailLog.id}` // Prevent duplicates
             },
             headers: {
-              'X-Internal-Secret': Deno.env.get('INTERNAL_EMAIL_SECRET')
+              'X-Internal-Secret': Deno.env.get('INTERNAL_EMAIL_SECRET') || ''
             }
           });
 

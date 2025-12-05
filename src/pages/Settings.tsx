@@ -14,36 +14,21 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { CRMCadences, CadenceRule } from '@/types/crmSettings';
 import { formatCadenceRule } from '@/utils/followUpCadence';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, User, Briefcase, Database, Clock, Users, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfileUpload } from '@/components/UserProfileUpload';
 import { CategoryManager } from '@/components/CategoryManager';
+import { UnifiedRelationshipManager } from '@/components/Settings/UnifiedRelationshipManager';
+import { ContactContextManager } from '@/components/Admin/ContactContextManager';
 import { useAccess } from '@/hooks/useAccess';
 import { useInboundIntegrations } from '@/hooks/useInboundIntegrations';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CreditCard, ExternalLink, Copy, TestTube, ArrowUpRight, ArrowDownLeft, Plus, CheckCircle, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-
-const statusLabels = {
-  cold: 'Cold Lead',
-  warm: 'Warm Lead', 
-  hot: 'Hot Lead',
-  won: 'Won/Closed',
-  lost_maybe_later: 'Lost - Maybe Later',
-  lost_not_fit: 'Lost - Not a Fit',
-  none: 'No Status',
-};
-
-const relationshipLabels = {
-  lead: 'Lead',
-  lead_amplifier: 'Lead Amplifier',
-  past_client: 'Past Client',
-  friend_family: 'Friend/Family',
-  associate_partner: 'Colleague/Associate',
-  referral_source: 'Referral Source',
-  booked_client: 'Booked Client',
-};
+import { useEnhancedRelationshipTypes } from '@/hooks/useEnhancedRelationshipTypes';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -51,7 +36,8 @@ export default function Settings() {
   const { settings, loading, saveSettings } = useCRMSettings();
   const { profile, loading: profileLoading, saveProfile } = useBusinessProfile();
   const { profile: userProfile, loading: userProfileLoading, saveProfile: saveUserProfile } = useUserProfile();
-  const { hasAccess, hasSubscription, hasTrial, trialEndDate, reason, createCheckout, openCustomerPortal } = useAccess();
+  const { hasAccess, hasSubscription, reason, createCheckout, openCustomerPortal } = useAccess();
+  const { relationshipTypes, isLoading: typesLoading } = useEnhancedRelationshipTypes();
   
   const { 
     tokens, 
@@ -85,6 +71,7 @@ export default function Settings() {
     displayName: '',
     location: '',
     avatarUrl: '',
+    sidebarClickToExpand: false,
   });
 
   // Copy states for new integrations UI
@@ -115,30 +102,34 @@ export default function Settings() {
         displayName: userProfile.display_name || '',
         location: userProfile.location || '',
         avatarUrl: userProfile.avatar_url || '',
+        sidebarClickToExpand: userProfile.sidebar_click_to_expand || false,
       });
     }
   }, [userProfile]);
 
 
   const handleCadenceChange = (
-    section: 'status' | 'relationship' | 'fallback',
-    key: string | null,
+    intentGroup: keyof CRMCadences,
+    statusKey: string | null,
     field: 'enabled' | 'value' | 'unit',
     value: any
   ) => {
     setLocalCadences(prev => {
       const newCadences = { ...prev };
       
-      if (section === 'fallback') {
+      if (intentGroup === 'fallback') {
         newCadences.fallback = {
           ...newCadences.fallback,
           [field]: field === 'value' ? (value === '' ? 1 : parseInt(value) || 0) : value,
         };
-      } else if (key && (section === 'status' || section === 'relationship')) {
-        (newCadences[section] as any)[key] = {
-          ...(newCadences[section] as any)[key],
-          [field]: field === 'value' ? (value === '' ? 1 : parseInt(value) || 0) : value,
-        };
+      } else if (statusKey) {
+        const group = newCadences[intentGroup] as any;
+        if (group) {
+          group[statusKey] = {
+            ...group[statusKey],
+            [field]: field === 'value' ? (value === '' ? 1 : parseInt(value) || 0) : value,
+          };
+        }
       }
       
       return newCadences;
@@ -177,6 +168,7 @@ export default function Settings() {
       display_name: userForm.displayName,
       location: userForm.location,
       avatar_url: userForm.avatarUrl,
+      sidebar_click_to_expand: userForm.sidebarClickToExpand,
     });
     if (success) {
       toast({
@@ -308,13 +300,39 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="user-profile" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="user-profile">Profile</TabsTrigger>
-            <TabsTrigger value="business-profile">Business</TabsTrigger>
-            <TabsTrigger value="billing">Billing</TabsTrigger>
-            <TabsTrigger value="integrations">Data & Integrations</TabsTrigger>
-            <TabsTrigger value="crm">Follow-up Settings</TabsTrigger>
-            <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsList className="inline-flex h-auto w-full flex-wrap items-center justify-start gap-1 bg-muted/50 p-2 rounded-lg border shadow-sm">
+            <TabsTrigger value="user-profile" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Profile</span>
+            </TabsTrigger>
+            <TabsTrigger value="business-profile" className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4" />
+              <span className="hidden sm:inline">Business</span>
+            </TabsTrigger>
+            <TabsTrigger value="billing" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">Billing</span>
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              <span className="hidden sm:inline">Integrations</span>
+            </TabsTrigger>
+            <TabsTrigger value="crm" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span className="hidden sm:inline">Follow-ups</span>
+            </TabsTrigger>
+            <TabsTrigger value="relationships" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Relationships</span>
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              <span className="hidden sm:inline">Categories</span>
+            </TabsTrigger>
+            <TabsTrigger value="tags" className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              <span className="hidden sm:inline">Tags</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="user-profile" className="space-y-6">
@@ -351,6 +369,33 @@ export default function Settings() {
                     onChange={(e) => setUserForm(prev => ({ ...prev, location: e.target.value }))}
                     placeholder="Enter your location (e.g., New York, NY)"
                   />
+                </div>
+
+                <Separator className="my-6" />
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-medium">Interface Preferences</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Customize how the application interface behaves
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="sidebarMode">Click to expand sidebar</Label>
+                      <p className="text-sm text-muted-foreground">
+                        When enabled, click the sidebar to expand it. When disabled, hover over the sidebar to expand it.
+                      </p>
+                    </div>
+                    <Switch
+                      id="sidebarMode"
+                      checked={userForm.sidebarClickToExpand}
+                      onCheckedChange={(checked) => 
+                        setUserForm(prev => ({ ...prev, sidebarClickToExpand: checked }))
+                      }
+                    />
+                  </div>
                 </div>
 
                 <div className="flex justify-end pt-4">
@@ -450,17 +495,8 @@ export default function Settings() {
                     <div>
                       <h3 className="font-medium">Current Plan</h3>
                       <p className="text-sm text-muted-foreground">
-                        {hasTrial ? 'Free Trial' : 
-                         hasSubscription ? 'Pro Plan' : 
-                         'Free Plan'}
+                        {hasSubscription ? 'Pro Plan' : 'Free Plan'}
                       </p>
-                    </div>
-                    <div className="text-right">
-                      {hasTrial && trialEndDate && (
-                        <p className="text-sm font-medium text-orange-600">
-                          Trial ends: {new Date(trialEndDate).toLocaleDateString()}
-                        </p>
-                      )}
                     </div>
                   </div>
 
@@ -935,88 +971,125 @@ export default function Settings() {
                   <>
                     <Separator />
                     
-                    {/* Priority Explanation */}
-                    <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
-                      <h3 className="text-sm font-semibold text-primary">📋 How Priority Works</h3>
-                      <div className="text-sm space-y-2">
-                        <div className="flex items-start gap-3">
-                          <span className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">1</span>
-                          <div>
-                            <p className="font-medium">Relationship-Based Cadences (Leads & Lead Amplifiers)</p>
-                            <p className="text-muted-foreground text-xs">For contacts with relationship type "Lead" or "Lead Amplifier", their relationship type determines the cadence first.</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <span className="bg-secondary text-secondary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
-                          <div>
-                            <p className="font-medium">Status-Based Cadences (Fallback for Leads)</p>
-                            <p className="text-muted-foreground text-xs">If the relationship rule is disabled for Leads/Lead Amplifiers, their status determines the cadence.</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <span className="bg-muted-foreground text-background rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">3</span>
-                          <div>
-                            <p className="font-medium">Fallback Cadence</p>
-                            <p className="text-muted-foreground text-xs">Used when no other rules apply or when other rules are disabled.</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Status-Based Cadences</h3>
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="bg-secondary text-secondary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">2</span>
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Fallback for Leads:</strong> These rules apply only when relationship rules are disabled for "Lead" or "Lead Amplifier" contacts
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        {Object.entries(statusLabels).map(([key, label]) => (
-                          <div key={key} className="flex items-center justify-between">
-                            <Label className="min-w-32">{label}</Label>
-                            {renderCadenceControls(
-                              localCadences.status[key as keyof typeof localCadences.status],
-                              (field, value) => handleCadenceChange('status', key, field as any, value)
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Intent-Based Cadences</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Set automatic follow-up timing for each relationship type and status
+                      </p>
 
-                    <Separator />
-
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2">Relationship-Based Cadences</h3>
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">1</span>
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Highest Priority:</strong> For Leads/Lead Amplifiers, these rules take precedence. For others, these are the primary rules.
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        {Object.entries(relationshipLabels).map(([key, label]) => (
-                          <div key={key} className="flex items-center justify-between">
-                            <Label className="min-w-32">{label}</Label>
-                            {renderCadenceControls(
-                              localCadences.relationship[key as keyof typeof localCadences.relationship],
-                              (field, value) => handleCadenceChange('relationship', key, field as any, value)
-                            )}
+                      {/* Business Lead */}
+                      <Collapsible defaultOpen className="border rounded-lg">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className="h-4 w-4" />
+                            <h4 className="font-medium">Business Lead</h4>
                           </div>
-                        ))}
-                      </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="p-4 pt-0 space-y-3">
+                          {Object.entries(localCadences.business_lead_statuses).map(([key, rule]) => (
+                            <div key={key} className="flex items-center justify-between">
+                              <Label className="min-w-32 capitalize">{key.replace(/_/g, ' ')}</Label>
+                              {renderCadenceControls(
+                                rule,
+                                (field, value) => handleCadenceChange('business_lead_statuses', key, field as any, value)
+                              )}
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      {/* Business Nurture */}
+                      <Collapsible className="border rounded-lg">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className="h-4 w-4" />
+                            <h4 className="font-medium">Business Nurture</h4>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="p-4 pt-0 space-y-3">
+                          {Object.entries(localCadences.business_nurture_statuses).map(([key, rule]) => (
+                            <div key={key} className="flex items-center justify-between">
+                              <Label className="min-w-32 capitalize">{key.replace(/_/g, ' ')}</Label>
+                              {renderCadenceControls(
+                                rule,
+                                (field, value) => handleCadenceChange('business_nurture_statuses', key, field as any, value)
+                              )}
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      {/* Personal */}
+                      <Collapsible className="border rounded-lg">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className="h-4 w-4" />
+                            <h4 className="font-medium">Personal</h4>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="p-4 pt-0 space-y-3">
+                          {Object.entries(localCadences.personal_statuses).map(([key, rule]) => (
+                            <div key={key} className="flex items-center justify-between">
+                              <Label className="min-w-32 capitalize">{key.replace(/_/g, ' ')}</Label>
+                              {renderCadenceControls(
+                                rule,
+                                (field, value) => handleCadenceChange('personal_statuses', key, field as any, value)
+                              )}
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      {/* Civic & Community */}
+                      <Collapsible className="border rounded-lg">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className="h-4 w-4" />
+                            <h4 className="font-medium">Civic & Community</h4>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="p-4 pt-0 space-y-3">
+                          {Object.entries(localCadences.civic_statuses).map(([key, rule]) => (
+                            <div key={key} className="flex items-center justify-between">
+                              <Label className="min-w-32 capitalize">{key.replace(/_/g, ' ')}</Label>
+                              {renderCadenceControls(
+                                rule,
+                                (field, value) => handleCadenceChange('civic_statuses', key, field as any, value)
+                              )}
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      {/* Service Provider / Vendor */}
+                      <Collapsible className="border rounded-lg">
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <ChevronDown className="h-4 w-4" />
+                            <h4 className="font-medium">Service Provider / Vendor</h4>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="p-4 pt-0 space-y-3">
+                          {Object.entries(localCadences.vendor_statuses).map(([key, rule]) => (
+                            <div key={key} className="flex items-center justify-between">
+                              <Label className="min-w-32 capitalize">{key.replace(/_/g, ' ')}</Label>
+                              {renderCadenceControls(
+                                rule,
+                                (field, value) => handleCadenceChange('vendor_statuses', key, field as any, value)
+                              )}
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
 
                     <Separator />
 
                     <div>
                       <h3 className="text-lg font-semibold mb-2">Fallback Cadence</h3>
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="bg-muted-foreground text-background rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">3</span>
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Last Resort:</strong> Used when no other rule applies or when other rules are disabled
-                        </p>
-                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Used when a contact's status doesn't have a specific cadence set
+                      </p>
                       <div className="flex items-center justify-between">
                         <Label>Default follow-up</Label>
                         {renderCadenceControls(
@@ -1039,6 +1112,24 @@ export default function Settings() {
 
             <TabsContent value="categories">
               <CategoryManager />
+            </TabsContent>
+
+            <TabsContent value="relationships">
+              <UnifiedRelationshipManager />
+            </TabsContent>
+
+            <TabsContent value="tags">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Contact Context Tags</CardTitle>
+                  <CardDescription>
+                    Create custom tags to organize and categorize your contacts. Tags can be assigned to contacts for flexible filtering and organization.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ContactContextManager />
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
 

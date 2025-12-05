@@ -6,24 +6,39 @@ export interface CadenceRule {
   unit?: CadenceUnit;
 }
 
+// Intent-based cadence structure
 export interface CRMCadences {
-  status: {
+  business_lead_statuses: {
     cold: CadenceRule;
     warm: CadenceRule;
     hot: CadenceRule;
     won: CadenceRule;
-    lost_maybe_later: CadenceRule;
     lost_not_fit: CadenceRule;
-    none: CadenceRule;
+    lost_maybe_later: CadenceRule;
   };
-  relationship: {
-    lead: CadenceRule;
-    lead_amplifier: CadenceRule;
+  business_nurture_statuses: {
+    current_client: CadenceRule;
     past_client: CadenceRule;
-    friend_family: CadenceRule;
-    associate_partner: CadenceRule;
-    referral_source: CadenceRule;
-    booked_client: CadenceRule;
+    current_amplifier: CadenceRule;
+    strategic_partner: CadenceRule;
+  };
+  personal_statuses: {
+    friendly_not_close: CadenceRule;
+    outer_circle: CadenceRule;
+    close_circle: CadenceRule;
+    inner_circle: CadenceRule;
+    past_connection: CadenceRule;
+  };
+  civic_statuses: {
+    new: CadenceRule;
+    connected: CadenceRule;
+    trusted: CadenceRule;
+    unaligned: CadenceRule;
+  };
+  vendor_statuses: {
+    potential: CadenceRule;
+    active: CadenceRule;
+    preferred: CadenceRule;
   };
   fallback: CadenceRule;
 }

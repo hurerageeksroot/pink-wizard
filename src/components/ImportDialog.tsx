@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Papa from "papaparse";
-import { Contact, ContactCategory, RelationshipType, LeadStatus } from "@/types/crm";
+import { Contact, ContactCategory, RelationshipType, LeadStatus, RelationshipIntent, RelationshipStatus } from "@/types/crm";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,14 +8,25 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, Download, CheckCircle, AlertCircle, X } from "lucide-react";
+import { Upload, Download, CheckCircle, AlertCircle, X, ChevronsUpDown, Tag, Instagram } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import { getIconComponent } from "@/utils/iconMapping";
 import { useToast } from "@/hooks/use-toast";
 import { useContactCategories } from "@/hooks/useContactCategories";
+import { useEnhancedRelationshipTypes } from "@/hooks/useEnhancedRelationshipTypes";
+import { useContactContexts } from "@/hooks/useContactContexts";
+import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ImportDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (contacts: Partial<Contact>[]) => void;
+  onImport: (contacts: Partial<Contact>[]) => Promise<{ contactIds: string[] }>;
   existingEmails: string[];
 }
 
@@ -45,27 +56,67 @@ interface ParsedRow {
 
 interface ImportDefaults {
   relationshipType: RelationshipType;
+  relationshipIntent: RelationshipIntent;
+  relationshipStatus: RelationshipStatus;
   status: LeadStatus;
   category: ContactCategory;
   source: string;
+  contextTagIds: string[];
 }
 
 export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: ImportDialogProps) {
   const { categories } = useContactCategories();
+  const { relationshipTypes, getDefaultStatusForType, getStatusOptionsForType, getRelationshipTypeByName } = useEnhancedRelationshipTypes();
+  const { contexts, loading: contextsLoading } = useContactContexts();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [defaults, setDefaults] = useState<ImportDefaults>({
-    relationshipType: 'lead',
+    relationshipType: 'cold_lead',
+    relationshipIntent: 'business_lead_statuses',
+    relationshipStatus: 'cold',
     status: 'cold',
     category: 'uncategorized',
-    source: 'CSV Import'
+    source: 'CSV Import',
+    contextTagIds: []
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAllRows, setShowAllRows] = useState(false);
+  const [contextTagsOpen, setContextTagsOpen] = useState(false);
   const { toast } = useToast();
 
+  // Update intent and status when relationship type changes
+  useEffect(() => {
+    const selectedType = getRelationshipTypeByName(defaults.relationshipType);
+    if (selectedType) {
+      const newIntent = selectedType.relationshipIntent;
+      const newDefaultStatus = getDefaultStatusForType(defaults.relationshipType);
+      
+      setDefaults(prev => ({
+        ...prev,
+        relationshipIntent: newIntent,
+        relationshipStatus: newDefaultStatus
+      }));
+    }
+  }, [defaults.relationshipType, getRelationshipTypeByName, getDefaultStatusForType]);
+
+  // Get available status options for current relationship type
+  const availableStatusOptions = useMemo(() => {
+    const statusOpts = getStatusOptionsForType(defaults.relationshipType);
+    return Object.entries(statusOpts).map(([key, config]) => ({
+      value: key,
+      label: config.label
+    }));
+  }, [defaults.relationshipType, getStatusOptionsForType]);
+
+  // Sort relationship types alphabetically by label
+  const sortedRelationshipTypes = useMemo(() => {
+    return [...relationshipTypes].sort((a, b) => 
+      a.label.localeCompare(b.label)
+    );
+  }, [relationshipTypes]);
+
   const downloadTemplate = () => {
-    const template = "name,email,company,position,phone,address,city,state,zip_code,country,linkedinUrl,websiteUrl,instagram,twitter,facebook,tiktok,source,notes\nJohn Doe,john@example.com,Example Corp,Manager,(555) 123-4567,123 Main St,New York,NY,10001,USA,https://linkedin.com/in/johndoe,https://johndoe.com,@johndoe_insta,@johndoe,@john.doe,@johndoe_tiktok,Referral,Great lead from networking event";
+    const template = "name,email,company,position,phone,address,city,state,zip_code,country,linkedinUrl,websiteUrl,instagram,twitter,facebook,tiktok,relationshipStatus,relationshipIntent,contextTags,source,notes\nJohn Doe,john@example.com,Example Corp,Manager,(555) 123-4567,123 Main St,New York,NY,10001,USA,https://linkedin.com/in/johndoe,https://johndoe.com,@johndoe_insta,@johndoe,@john.doe,@johndoe_tiktok,Current Client,business_nurture_statuses,\"vip,referral\",Referral,Great contact from networking event";
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -75,43 +126,51 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
     URL.revokeObjectURL(url);
   };
 
-  // Robust mapping for relationship types
+  // Robust mapping for relationship types - maps old names to new standardized names
   const mapRelationshipType = (value: string): RelationshipType => {
     const normalized = value.toLowerCase().trim();
     const relationshipMap: Record<string, RelationshipType> = {
-      'lead': 'lead',
-      'leads': 'lead',
-      'prospect': 'lead',
-      'prospects': 'lead',
-      'past client': 'past_client',
-      'past_client': 'past_client',
-      'pastclient': 'past_client',
-      'past clients': 'past_client',
-      'previous client': 'past_client',
-      'former client': 'past_client',
-      'client': 'past_client',
-      'clients': 'past_client',
-      'current client': 'booked_client',
-      'booked client': 'booked_client',
-      'booked_client': 'booked_client',
-      'active client': 'booked_client',
-      'friend': 'friend_family',
-      'family': 'friend_family',
-      'friend_family': 'friend_family',
-      'friends': 'friend_family',
-      'associate': 'associate_partner',
-      'partner': 'associate_partner',
-      'associates': 'associate_partner',
-      'partners': 'associate_partner',
-      'associate_partner': 'associate_partner',
-      'referral source': 'referral_source',
-      'referral_source': 'referral_source',
-      'referrer': 'referral_source',
-      'lead amplifier': 'lead_amplifier',
-      'lead_amplifier': 'lead_amplifier',
-      'amplifier': 'lead_amplifier',
+      // New standardized names
+      'cold_lead': 'cold_lead',
+      'warm_lead': 'warm_lead',
+      'hot_lead': 'hot_lead',
+      'client': 'client',
+      'referral': 'referral',
+      'partner': 'partner',
+      'personal_contact': 'personal_contact',
+      'general_contact': 'general_contact',
+      // Old names → New names mapping
+      'lead': 'cold_lead',
+      'leads': 'cold_lead',
+      'prospect': 'cold_lead',
+      'prospects': 'cold_lead',
+      'past client': 'referral',
+      'past_client': 'referral',
+      'pastclient': 'referral',
+      'past clients': 'referral',
+      'previous client': 'referral',
+      'former client': 'referral',
+      'clients': 'client',
+      'current client': 'client',
+      'booked client': 'client',
+      'booked_client': 'client',
+      'active client': 'client',
+      'friend': 'personal_contact',
+      'family': 'personal_contact',
+      'friend_family': 'personal_contact',
+      'friends': 'personal_contact',
+      'associate': 'partner',
+      'associates': 'partner',
+      'partners': 'partner',
+      'associate_partner': 'partner',
+      'referral source': 'referral',
+      'referral_source': 'referral',
+      'referrer': 'referral',
+      'lead amplifier': 'warm_lead',
+      'lead_amplifier': 'warm_lead',
+      'amplifier': 'warm_lead',
     };
-    return relationshipMap[normalized] || 'lead';
+    return relationshipMap[normalized] || 'cold_lead';
   };
 
   // Robust mapping for lead status
@@ -186,6 +245,10 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
       'relationshiptype': 'relationshipType',
       'status': 'leadStatus',
       'leadstatus': 'leadStatus',
+      'relationshipstatus': 'relationshipStatus',
+      'relationshipintent': 'relationshipIntent',
+      'contexttags': 'contextTags',
+      'tags': 'contextTags',
     };
     return headerMap[normalized] || normalized;
   };
@@ -195,7 +258,7 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
     return emailRegex.test(email);
   };
 
-  const validateRow = (row: any, csvEmails: Set<string>, currentIndex: number): ParsedRow & { relationshipType?: RelationshipType; leadStatus?: LeadStatus } => {
+  const validateRow = (row: any, csvEmails: Set<string>, currentIndex: number): ParsedRow & { relationshipType?: RelationshipType; leadStatus?: LeadStatus; relationshipStatus?: string; relationshipIntent?: string; contextTags?: string[] } => {
     const errors: string[] = [];
     
     // Enhanced name composition logic
@@ -230,7 +293,10 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
     // Validation: only require name if we couldn't derive it from any source
     if (!name) errors.push('Name is required (no name, firstName/lastName, or email to derive from)');
     if (!email) {
-      errors.push('Email is required');
+      // Only require email for non-Instagram imports
+      if (!row.instagram) {
+        errors.push('Email is required');
+      }
     } else if (!validateEmail(email)) {
       errors.push('Invalid email format');
     }
@@ -254,12 +320,28 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
     // Handle relationship type and status mapping if provided in CSV
     let mappedRelationshipType: RelationshipType | undefined;
     let mappedLeadStatus: LeadStatus | undefined;
+    let mappedRelationshipStatus: string | undefined;
+    let mappedRelationshipIntent: string | undefined;
+    let parsedContextTags: string[] | undefined;
 
     if (row.relationshipType) {
       mappedRelationshipType = mapRelationshipType(row.relationshipType.toString().trim());
     }
     if (row.leadStatus) {
       mappedLeadStatus = mapLeadStatus(row.leadStatus.toString().trim());
+    }
+    if (row.relationshipStatus) {
+      mappedRelationshipStatus = row.relationshipStatus.toString().trim();
+    }
+    if (row.relationshipIntent) {
+      mappedRelationshipIntent = row.relationshipIntent.toString().trim();
+    }
+    if (row.contextTags) {
+      parsedContextTags = row.contextTags
+        .toString()
+        .split(',')
+        .map((tag: string) => tag.trim())
+        .filter(Boolean);
     }
 
     return {
@@ -283,6 +365,9 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
       notes: (row.notes || '').toString().trim() || undefined,
       relationshipType: mappedRelationshipType,
       leadStatus: mappedLeadStatus,
+      relationshipStatus: mappedRelationshipStatus,
+      relationshipIntent: mappedRelationshipIntent,
+      contextTags: parsedContextTags,
       isValid: errors.length === 0,
       isDuplicate,
       errors
@@ -339,6 +424,71 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
     });
   };
 
+  const parseInstagramJSON = (jsonData: any): ParsedRow[] => {
+    const rows: ParsedRow[] = [];
+    
+    // Instagram export structure: array of objects with string_list_data
+    const followersArray = Array.isArray(jsonData) ? jsonData : jsonData.followers_1 || [];
+    
+    followersArray.forEach((followerObj: any) => {
+      const data = followerObj.string_list_data?.[0];
+      if (!data) return;
+      
+      const username = data.value;
+      const profileUrl = data.href;
+      const timestamp = data.timestamp;
+      const followDate = new Date(timestamp * 1000);
+      
+      rows.push({
+        name: `@${username}`,
+        email: null, // Will be enriched later
+        instagram: username,
+        websiteUrl: profileUrl,
+        source: defaults.source || 'Instagram Import',
+        notes: `Instagram profile: ${profileUrl}\nFollowed since: ${followDate.toLocaleDateString()}`,
+        isValid: true,
+        isDuplicate: false,
+        errors: []
+      });
+    });
+    
+    return rows;
+  };
+
+  const handleInstagramUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const jsonData = JSON.parse(e.target?.result as string);
+        const parsed = parseInstagramJSON(jsonData);
+        
+        // Check for duplicates against existing emails (none for Instagram initially)
+        const duplicateChecked = parsed.map(row => ({
+          ...row,
+          isDuplicate: false
+        }));
+        
+        setParsedData(duplicateChecked);
+        
+        toast({
+          title: "Instagram Data Parsed",
+          description: `Found ${parsed.length} Instagram followers ready to import`,
+        });
+      } catch (error) {
+        console.error('Parse error:', error);
+        toast({
+          title: "Parse Error",
+          description: "Invalid Instagram JSON format. Please upload followers_1.json from your Instagram data export.",
+          variant: "destructive"
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleImport = async () => {
     if (!parsedData) return;
     
@@ -360,13 +510,15 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
     const contactsToImport = validContacts.map(row => {
       const relationshipType = (row as any).relationshipType || defaults.relationshipType;
       const status = (row as any).leadStatus || defaults.status;
+      const relationshipStatus = (row as any).relationshipStatus || defaults.relationshipStatus;
+      const relationshipIntent = (row as any).relationshipIntent || defaults.relationshipIntent;
       
-      // Smart coupling: won status should set relationship to booked_client
-      const finalRelationshipType = status === 'won' ? 'booked_client' : relationshipType;
+      // Smart coupling: won status should set relationship to client
+      const finalRelationshipType = status === 'won' ? 'client' : relationshipType;
 
       return {
         name: row.name,
-        email: row.email,
+        email: row.email || null,
         company: row.company || null,
         phone: row.phone || null,
         position: row.position || null,
@@ -385,6 +537,8 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
         },
         status,
         relationship_type: finalRelationshipType,
+        relationship_status: relationshipStatus,
+        relationship_intent: relationshipIntent,
         category: defaults.category,
         source: row.source || defaults.source,
         notes: row.notes || null,
@@ -393,6 +547,7 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
         booking_scheduled: false,
         archived: false,
         next_follow_up: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+        contextTags: (row as any).contextTags, // Pass through for context assignment
       };
     });
 
@@ -400,7 +555,33 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
       console.log(`📦 Importing ${contactsToImport.length} contacts`);
       console.log('🔍 Import data preview:', contactsToImport.slice(0, 2));
       
-      await onImport(contactsToImport);
+      const result = await onImport(contactsToImport);
+      
+      // Assign context tags after successful import
+      if (defaults.contextTagIds.length > 0 && result.contactIds.length > 0) {
+        const contextAssignments = [];
+        for (const contactId of result.contactIds) {
+          for (const contextId of defaults.contextTagIds) {
+            contextAssignments.push({
+              contact_id: contactId,
+              context_id: contextId
+            });
+          }
+        }
+        
+        const { error: contextError } = await supabase
+          .from('contact_context_assignments')
+          .insert(contextAssignments);
+        
+        if (contextError) {
+          console.error('Context tag assignment error:', contextError);
+          toast({
+            title: "Partial success",
+            description: "Contacts imported but some context tags failed to apply.",
+            variant: "destructive"
+          });
+        }
+      }
       
       // Note: Success toast will be handled by the parent component
       // which has more detailed information about actual import results
@@ -439,10 +620,13 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
     setParsedData([]);
     setShowAllRows(false);
     setDefaults({
-      relationshipType: 'lead',
+      relationshipType: 'cold_lead',
+      relationshipIntent: 'business_lead_statuses',
+      relationshipStatus: 'cold',
       status: 'cold',
       category: 'uncategorized',
-      source: 'CSV Import'
+      source: 'CSV Import',
+      contextTagIds: []
     });
     onClose();
   };
@@ -465,48 +649,93 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-border">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-card border-border">
         <DialogHeader className="border-b border-border pb-4">
-          <DialogTitle className="text-card-foreground">Import Contacts from CSV</DialogTitle>
+          <DialogTitle className="text-card-foreground">Import Contacts</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 p-1">
-          {/* File Upload Section */}
-          <div className="space-y-4 bg-muted/20 p-4 rounded-lg border border-border">
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Label htmlFor="csv-file" className="text-foreground font-medium">Upload CSV File</Label>
+          {/* Tabs for CSV and Instagram Import */}
+          <Tabs defaultValue="csv" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="csv">CSV Import</TabsTrigger>
+              <TabsTrigger value="instagram">Instagram JSON</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="csv" className="space-y-4">
+              {/* File Upload Section */}
+              <div className="space-y-4 bg-muted/20 p-4 rounded-lg border border-border">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="csv-file" className="text-foreground font-medium">Upload CSV File</Label>
+                    <Input
+                      id="csv-file"
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      className="mt-2 bg-background border-border text-foreground file:bg-primary file:text-primary-foreground file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={downloadTemplate}
+                    className="mt-8 border-border hover:bg-muted"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Template
+                  </Button>
+                </div>
+                
+                {isProcessing && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    Processing CSV file...
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="instagram" className="space-y-4">
+              <Alert>
+                <Instagram className="h-4 w-4" />
+                <AlertTitle>Import Instagram Followers</AlertTitle>
+                <AlertDescription>
+                  <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
+                    <li>Go to Instagram → Settings → Privacy → Download Your Information</li>
+                    <li>Select JSON format and request download</li>
+                    <li>Wait 1-2 days for Instagram to prepare your data</li>
+                    <li>Extract the ZIP and upload <code className="bg-muted px-1 py-0.5 rounded">followers_1.json</code> here</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+              
+              <div className="space-y-2">
+                <Label htmlFor="instagram-file">Select followers_1.json</Label>
                 <Input
-                  id="csv-file"
+                  id="instagram-file"
                   type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="mt-2 bg-background border-border text-foreground file:bg-primary file:text-primary-foreground file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3"
+                  accept=".json"
+                  onChange={handleInstagramUpload}
+                  className="bg-background border-border text-foreground file:bg-primary file:text-primary-foreground file:border-0 file:rounded-md file:px-3 file:py-1 file:mr-3"
                 />
               </div>
-              <Button
-                variant="outline"
-                onClick={downloadTemplate}
-                className="mt-8 border-border hover:bg-muted"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download Template
-              </Button>
-            </div>
-            
-            {isProcessing && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                Processing CSV file...
-              </div>
-            )}
-          </div>
+              
+              {parsedData.length > 0 && (
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Found {parsedData.length} Instagram contacts. After import, use "Start Research" to enrich profiles with contact information from their bios.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+          </Tabs>
 
           {/* Import Defaults */}
           {file && (
             <div className="border border-border rounded-lg p-4 space-y-4 bg-card">
               <h3 className="font-medium text-card-foreground">Import Defaults</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <Label className="text-foreground">Relationship Type</Label>
                   <Select value={defaults.relationshipType} onValueChange={(value: RelationshipType) => setDefaults({...defaults, relationshipType: value})}>
@@ -514,12 +743,11 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-popover border-border">
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="past_client">Past Client</SelectItem>
-                      <SelectItem value="friend_family">Friend/Family</SelectItem>
-                      <SelectItem value="associate_partner">Colleague/Associate</SelectItem>
-                      <SelectItem value="referral_source">Referral Source</SelectItem>
-                      <SelectItem value="booked_client">Booked Client</SelectItem>
+                      {sortedRelationshipTypes.map((type) => (
+                        <SelectItem key={type.name} value={type.name}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -569,6 +797,85 @@ export function ImportDialog({ isOpen, onClose, onImport, existingEmails }: Impo
                     placeholder="CSV Import"
                     className="bg-background border-border text-foreground"
                   />
+                </div>
+
+                <div>
+                  <Label className="text-foreground">Relationship Status</Label>
+                  <Select 
+                    value={defaults.relationshipStatus} 
+                    onValueChange={(value: RelationshipStatus) => setDefaults({...defaults, relationshipStatus: value})}
+                  >
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      {availableStatusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-foreground">Context Tags</Label>
+                  <Popover open={contextTagsOpen} onOpenChange={setContextTagsOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={contextTagsOpen}
+                        className="w-full justify-between bg-background border-border text-foreground hover:bg-muted"
+                      >
+                        {defaults.contextTagIds.length > 0
+                          ? `${defaults.contextTagIds.length} tag${defaults.contextTagIds.length > 1 ? 's' : ''} selected`
+                          : "Select tags..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0 bg-popover border-border">
+                      <Command className="bg-popover">
+                        <CommandInput placeholder="Search tags..." className="bg-popover text-foreground" />
+                        <CommandEmpty>No tags found.</CommandEmpty>
+                        <CommandGroup className="max-h-64 overflow-y-auto">
+                          {contextsLoading ? (
+                            <div className="p-2 text-sm text-muted-foreground">Loading tags...</div>
+                          ) : (
+                            contexts.map((context) => {
+                              const IconComponent = getIconComponent(context.iconName || 'Tag');
+                              return (
+                                <CommandItem
+                                  key={context.id}
+                                  value={context.name}
+                                  onSelect={() => {
+                                    setDefaults(prev => ({
+                                      ...prev,
+                                      contextTagIds: prev.contextTagIds.includes(context.id)
+                                        ? prev.contextTagIds.filter(id => id !== context.id)
+                                        : [...prev.contextTagIds, context.id]
+                                    }));
+                                  }}
+                                  className="text-foreground hover:bg-muted cursor-pointer"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      defaults.contextTagIds.includes(context.id) ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <Badge className={`${context.colorClass || 'bg-secondary'} pointer-events-none`}>
+                                    <IconComponent className="w-3 h-3 mr-1" />
+                                    {context.label || context.name}
+                                  </Badge>
+                                </CommandItem>
+                              );
+                            })
+                          )}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>

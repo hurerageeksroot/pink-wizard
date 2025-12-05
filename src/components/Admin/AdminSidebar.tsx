@@ -13,7 +13,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Mail,
-  Target
+  Target,
+  UserCircle,
+  ListChecks,
+  Download,
+  Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +36,11 @@ const navigationItems = [
     name: 'Users',
     href: '/admin/users',
     icon: Users
+  },
+  {
+    name: 'Waitlist',
+    href: '/admin/waitlist',
+    icon: ListChecks
   },
   {
     name: 'Challenges',
@@ -54,9 +63,24 @@ const navigationItems = [
     icon: Settings
   },
   {
+    name: 'Relationships',
+    href: '/admin/relationships',
+    icon: UserCircle
+  },
+  {
     name: 'Challenge Audit',
     href: '/admin/challenge-audit',
     icon: Target
+  },
+  {
+    name: 'Data Export',
+    href: '/admin/data-export',
+    icon: Download
+  },
+  {
+    name: 'Data Import',
+    href: '/admin/data-import',
+    icon: Upload
   }
 ];
 

@@ -5,26 +5,84 @@ import { CRMSettings, CRMCadences } from '@/types/crmSettings';
 import { useToast } from '@/hooks/use-toast';
 
 const defaultCadences: CRMCadences = {
-  status: {
-    cold: { enabled: true, value: 2, unit: 'weeks' },
-    warm: { enabled: true, value: 3, unit: 'days' },
-    hot: { enabled: true, value: 1, unit: 'days' },
+  business_lead_statuses: {
+    cold: { enabled: true, value: 1, unit: 'months' },
+    warm: { enabled: true, value: 1, unit: 'weeks' },
+    hot: { enabled: true, value: 3, unit: 'days' },
     won: { enabled: false },
-    lost_maybe_later: { enabled: true, value: 6, unit: 'months' },
     lost_not_fit: { enabled: false },
-    none: { enabled: true, value: 1, unit: 'weeks' },
+    lost_maybe_later: { enabled: true, value: 3, unit: 'months' },
   },
-  relationship: {
-    lead: { enabled: true, value: 0, unit: 'days' }, // Today
-    lead_amplifier: { enabled: true, value: 1, unit: 'weeks' }, // 1 week
-    past_client: { enabled: true, value: 6, unit: 'months' },
-    friend_family: { enabled: true, value: 12, unit: 'months' },
-    associate_partner: { enabled: true, value: 3, unit: 'months' },
-    referral_source: { enabled: true, value: 3, unit: 'months' },
-    booked_client: { enabled: false, value: 1, unit: 'weeks' },
+  business_nurture_statuses: {
+    current_client: { enabled: true, value: 1, unit: 'weeks' },
+    past_client: { enabled: true, value: 3, unit: 'months' },
+    current_amplifier: { enabled: true, value: 2, unit: 'weeks' },
+    strategic_partner: { enabled: true, value: 1, unit: 'months' },
+  },
+  personal_statuses: {
+    friendly_not_close: { enabled: true, value: 3, unit: 'months' },
+    outer_circle: { enabled: true, value: 2, unit: 'months' },
+    close_circle: { enabled: true, value: 1, unit: 'months' },
+    inner_circle: { enabled: true, value: 2, unit: 'weeks' },
+    past_connection: { enabled: true, value: 6, unit: 'months' },
+  },
+  civic_statuses: {
+    new: { enabled: true, value: 1, unit: 'weeks' },
+    connected: { enabled: true, value: 1, unit: 'months' },
+    trusted: { enabled: true, value: 2, unit: 'months' },
+    unaligned: { enabled: false },
+  },
+  vendor_statuses: {
+    potential: { enabled: true, value: 2, unit: 'weeks' },
+    active: { enabled: true, value: 1, unit: 'months' },
+    preferred: { enabled: true, value: 3, unit: 'months' },
   },
   fallback: { enabled: true, value: 2, unit: 'weeks' },
 };
+
+// Runtime migration helper to ensure intent-based cadences
+function ensureIntentBasedCadences(cadences: any): CRMCadences {
+  // Check if already using new intent-based structure
+  if (cadences.business_lead_statuses) {
+    // Ensure all intent groups exist with defaults for any missing statuses
+    return {
+      business_lead_statuses: { ...defaultCadences.business_lead_statuses, ...cadences.business_lead_statuses },
+      business_nurture_statuses: { ...defaultCadences.business_nurture_statuses, ...cadences.business_nurture_statuses },
+      personal_statuses: { ...defaultCadences.personal_statuses, ...cadences.personal_statuses },
+      civic_statuses: { ...defaultCadences.civic_statuses, ...cadences.civic_statuses },
+      vendor_statuses: { ...defaultCadences.vendor_statuses, ...cadences.vendor_statuses },
+      fallback: cadences.fallback || defaultCadences.fallback,
+    };
+  }
+
+  // Migrate old flat status structure to new intent-based structure
+  if (cadences.status) {
+    const oldStatus = cadences.status;
+    return {
+      business_lead_statuses: {
+        cold: oldStatus.cold || defaultCadences.business_lead_statuses.cold,
+        warm: oldStatus.warm || defaultCadences.business_lead_statuses.warm,
+        hot: oldStatus.hot || defaultCadences.business_lead_statuses.hot,
+        won: oldStatus.won || defaultCadences.business_lead_statuses.won,
+        lost_not_fit: oldStatus.lost_not_fit || defaultCadences.business_lead_statuses.lost_not_fit,
+        lost_maybe_later: oldStatus.lost_maybe_later || defaultCadences.business_lead_statuses.lost_maybe_later,
+      },
+      business_nurture_statuses: { ...defaultCadences.business_nurture_statuses },
+      personal_statuses: { ...defaultCadences.personal_statuses },
+      civic_statuses: {
+        new: oldStatus.new || defaultCadences.civic_statuses.new,
+        connected: defaultCadences.civic_statuses.connected,
+        trusted: defaultCadences.civic_statuses.trusted,
+        unaligned: defaultCadences.civic_statuses.unaligned,
+      },
+      vendor_statuses: { ...defaultCadences.vendor_statuses },
+      fallback: cadences.fallback || defaultCadences.fallback,
+    };
+  }
+
+  // Return full defaults if no recognizable structure
+  return defaultCadences;
+}
 
 const fetchCRMSettings = async (userId: string): Promise<CRMSettings> => {
   try {
@@ -42,7 +100,7 @@ const fetchCRMSettings = async (userId: string): Promise<CRMSettings> => {
     if (data) {
       return {
         ...data,
-        cadences: data.cadences as unknown as CRMCadences,
+        cadences: ensureIntentBasedCadences(data.cadences),
       };
     } else {
       // Create default settings
@@ -65,7 +123,7 @@ const fetchCRMSettings = async (userId: string): Promise<CRMSettings> => {
       
       return {
         ...newSettings,
-        cadences: newSettings.cadences as unknown as CRMCadences,
+        cadences: ensureIntentBasedCadences(newSettings.cadences),
       };
     }
   } catch (error) {

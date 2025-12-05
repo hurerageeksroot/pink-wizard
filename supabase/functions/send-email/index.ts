@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Resend } from "npm:resend@2.0.0";
+import { Resend } from "https://esm.sh/resend@2.0.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 /**
  * Determines if a contact is a demo/test contact based on email indicators
@@ -127,14 +128,41 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // Define validation schema
+    const EmailRequestSchema = z.object({
+      templateKey: z.string().min(1).max(100),
+      recipientEmail: z.string().email().max(255),
+      recipientUserId: z.string().uuid().optional(),
+      variables: z.record(z.string()).default({}),
+      sendFrom: z.string().email().max(255).default("PinkWizard <hello@pink-wizard.com>"),
+      idempotencyKey: z.string().max(100).optional()
+    });
+
+    const rawData = await req.json();
+    const validationResult = EmailRequestSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      console.error('[send-email] Validation failed:', validationResult.error);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid email parameters',
+          code: 'VALIDATION_ERROR'
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
     const {
       templateKey,
       recipientEmail,
       recipientUserId,
       variables,
-      sendFrom = "PinkWizard <hello@pink-wizard.com>",
+      sendFrom,
       idempotencyKey
-    }: EmailRequest = await req.json();
+    } = validationResult.data;
 
     console.log(`[send-email] Processing email request for template: ${templateKey}, idempotency: ${idempotencyKey}`);
 
@@ -237,6 +265,47 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // For challenge completion emails, fetch winner data
+    if (templateKey === 'challenge_complete' && !variables.points_winner_name) {
+      try {
+        // Get top 3 from points leaderboard
+        const { data: pointsData, error: pointsError } = await supabase.rpc('get_points_leaderboard');
+        
+        // Get top 3 from revenue leaderboard
+        const { data: revenueData, error: revenueError } = await supabase.rpc('get_revenue_leaderboard');
+
+        if (!pointsError && pointsData && pointsData.length > 0) {
+          finalVariables = {
+            ...finalVariables,
+            points_winner_name: pointsData[0].display_name || 'Champion',
+            points_winner_points: String(pointsData[0].total_points || 0),
+            points_winner_activities: String(pointsData[0].total_activities || 0),
+            points_second_name: pointsData[1]?.display_name || '',
+            points_second_points: String(pointsData[1]?.total_points || 0),
+            points_third_name: pointsData[2]?.display_name || '',
+            points_third_points: String(pointsData[2]?.total_points || 0),
+          };
+        }
+
+        if (!revenueError && revenueData && revenueData.length > 0) {
+          finalVariables = {
+            ...finalVariables,
+            revenue_winner_name: revenueData[0].display_name || 'Revenue Champion',
+            revenue_winner_amount: String(revenueData[0].total_revenue || 0),
+            revenue_winner_contacts: String(revenueData[0].contacts_count || 0),
+            revenue_second_name: revenueData[1]?.display_name || '',
+            revenue_second_amount: String(revenueData[1]?.total_revenue || 0),
+            revenue_third_name: revenueData[2]?.display_name || '',
+            revenue_third_amount: String(revenueData[2]?.total_revenue || 0),
+          };
+        }
+
+        console.log(`[send-email] Enhanced challenge completion email with winner data`);
+      } catch (winnerError) {
+        console.warn(`[send-email] Could not fetch winner data:`, winnerError);
+      }
+    }
+
     // Replace variables in subject and content
     let subject = emailTemplate.subject;
     let htmlContent = emailTemplate.html_content;
@@ -319,7 +388,7 @@ const handler = async (req: Request): Promise<Response> => {
             }
             
             // Don't retry on daily quota exceeded - fail fast
-            if (emailError.name === 'daily_quota_exceeded') {
+            if (emailError && (emailError as any).name === 'daily_quota_exceeded') {
               console.error('[send-email] Daily quota exceeded - stopping retries');
               throw new Error('Daily email quota exceeded. Please try again tomorrow.');
             }
@@ -351,7 +420,7 @@ const handler = async (req: Request): Promise<Response> => {
           .update({
             status: 'sent',
             sent_at: new Date().toISOString(),
-            resend_id: emailResult.id
+            resend_id: emailResult?.id || null
           })
           .eq('id', logEntry.id);
       }
@@ -359,7 +428,7 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           success: true,
-          emailId: emailResult.id,
+          emailId: emailResult?.id || null,
           logId: logEntry?.id
         }),
         {
@@ -377,7 +446,7 @@ const handler = async (req: Request): Promise<Response> => {
           .from('email_logs')
           .update({
             status: 'failed',
-            error_message: emailError.message || 'Unknown error occurred'
+            error_message: emailError instanceof Error ? emailError.message : 'Unknown error occurred'
           })
           .eq('id', logEntry.id);
       }

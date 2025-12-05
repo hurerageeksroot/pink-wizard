@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { 
-  Users, 
-  Activity, 
-  CheckSquare, 
-  Network, 
-  BookOpen, 
-  Settings, 
+import {
+  Users,
+  Activity,
+  CheckSquare,
+  Network,
+  BookOpen,
+  Settings,
   HelpCircle,
   LogOut,
   User,
@@ -20,7 +20,7 @@ import {
   CreditCard,
   UserCog,
   MessageSquare,
-  Send
+  Send,
 } from "lucide-react";
 
 import {
@@ -37,22 +37,46 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from "@/contexts/AuthContext";
 import { useAccess } from "@/hooks/useAccess";
 import { useChallenge } from "@/hooks/useChallenge";
 import { useAdminData } from "@/hooks/useAdminData";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import DeskSidebar from "./DeskSidebar/DeskSidebar";
 
 const mainNavItems = [
-  { title: "Dashboard", url: "/?tab=dashboard", icon: Target, tab: "dashboard" },
+  {
+    title: "Dashboard",
+    url: "/?tab=dashboard",
+    icon: Target,
+    tab: "dashboard",
+  },
   { title: "Contacts", url: "/?tab=contacts", icon: Users, tab: "contacts" },
-  { title: "Activities", url: "/?tab=activities", icon: Activity, tab: "activities" },
+  {
+    title: "Activities",
+    url: "/?tab=activities",
+    icon: Activity,
+    tab: "activities",
+  },
   { title: "Tasks", url: "/?tab=tasks", icon: CheckSquare, tab: "tasks" },
-  { title: "Networking", url: "/?tab=networking", icon: Network, tab: "networking" },
-  { title: "Community", url: "/?tab=community", icon: MessageSquare, tab: "community" },
+  {
+    title: "Networking",
+    url: "/?tab=networking",
+    icon: Network,
+    tab: "networking",
+  },
+  {
+    title: "Community",
+    url: "/?tab=community",
+    icon: MessageSquare,
+    tab: "community",
+  },
 ];
 
 const secondaryNavItems = [
   { title: "AI Outreach", url: "/ai-outreach", icon: Sparkles },
+  { title: "Campaigns", url: "/campaigns", icon: Target },
+  { title: "Prospecting", url: "/prospecting", icon: Target },
   { title: "Leaderboard", url: "/leaderboard", icon: Trophy },
   { title: "Resources", url: "/resources", icon: BookOpen },
 ];
@@ -81,16 +105,20 @@ export function AppSidebar() {
   const [isHovered, setIsHovered] = useState(false);
   const { open, setOpen, isMobile } = useSidebar();
   const { user, signOut } = useAuth();
-  const { canWrite, subscribed, hasTrial } = useAccess();
+  const { canWrite, subscribed } = useAccess();
   const { isChallengeParticipant } = useChallenge();
   const { isAdmin } = useAdminData();
-  
+  const { profile } = useUserProfile();
+
+  // Get user preference for sidebar behavior (default to hover mode)
+  const preferClickMode = profile?.sidebar_click_to_expand ?? false;
+
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   const currentPath = location.pathname;
   const urlParams = new URLSearchParams(location.search);
-  const currentTab = urlParams.get('tab');
+  const currentTab = urlParams.get("tab");
 
   const isActive = (path: string, tab?: string) => {
     if (tab && currentPath === "/") {
@@ -100,19 +128,19 @@ export function AppSidebar() {
   };
 
   const getNavCls = (isActive: boolean) =>
-    isActive 
-      ? "bg-primary/10 text-primary font-medium border-r-2 border-primary" 
+    isActive
+      ? "bg-primary/10 text-primary font-medium border-r-2 border-primary"
       : "hover:bg-muted/50 text-muted-foreground hover:text-foreground";
 
   const handleSignOut = async () => {
-    console.log('[AppSidebar] Attempting to sign out...');
+    console.log("[AppSidebar] Attempting to sign out...");
     const { error } = await signOut();
     if (error) {
-      console.error('[AppSidebar] Sign out error:', error);
+      console.error("[AppSidebar] Sign out error:", error);
       // Force sign out by clearing local state and redirecting anyway
       navigate("/auth");
     } else {
-      console.log('[AppSidebar] Sign out successful');
+      console.log("[AppSidebar] Sign out successful");
       navigate("/");
     }
   };
@@ -121,14 +149,16 @@ export function AppSidebar() {
     return null;
   }
 
-  const isCollapsed = !open && !isHovered;
+  const isCollapsed = preferClickMode ? !open : !open && !isHovered;
 
   const handleMouseEnter = () => {
+    if (preferClickMode) return; // Don't respond to hover in click mode
     setIsHovered(true);
     if (!open) setOpen(true);
   };
 
   const handleMouseLeave = () => {
+    if (preferClickMode) return; // Don't respond to hover in click mode
     setIsHovered(false);
     // Close sidebar after hover ends unless it was manually opened
     setTimeout(() => {
@@ -136,180 +166,181 @@ export function AppSidebar() {
     }, 200);
   };
 
+  const handleSidebarClick = () => {
+    if (!preferClickMode) return; // Only respond to click in click mode
+    if (isCollapsed && !isMobile) {
+      setOpen(true);
+    }
+  };
+
   return (
-    <Sidebar 
-      collapsible="icon"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <SidebarContent className="flex flex-col h-full">
-        {/* User Profile Section */}
-        <div className={`p-4 border-b ${isCollapsed ? "px-2" : ""}`}>
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary/10 text-primary">
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user?.email || 'Not logged in'}
-                </p>
-                {canWrite && (
-                  <p className="text-xs text-muted-foreground">
-                    Growth Access
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Main Navigation */}
-        <SidebarGroup className="flex-1">
-          <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
-            Dashboard
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNavItems
-                .filter(item => item.title !== "Challenge Tasks" || isChallengeParticipant)
-                .map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      className={getNavCls(isActive(item.url, item.tab))}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <Separator />
-
-        {/* Secondary Navigation */}
-        <SidebarGroup>
-          <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
-            Tools
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {secondaryNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      className={getNavCls(isActive(item.url))}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <Separator />
-
-        {/* Admin Section - Only show for admin users */}
-        {isAdmin && (
-          <>
-            <SidebarGroup>
-              <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
-                Admin
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {adminNavItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild>
-                        <NavLink 
-                          to={item.url} 
-                          className={getNavCls(isActive(item.url))}
-                        >
-                          <item.icon className="h-4 w-4" />
-                          {!isCollapsed && <span>{item.title}</span>}
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-            
-            <Separator />
-          </>
-        )}
-
-        {/* Upgrade Section - Only show for trial users who are not admins */}
-        {hasTrial && !isAdmin && (
-          <>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {upgradeItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild>
-                        <NavLink 
-                          to={item.url} 
-                          className="bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
-                        >
-                          <item.icon className="h-4 w-4" />
-                          {!isCollapsed && <span>{item.title}</span>}
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-            
-            <Separator />
-          </>
-        )}
-
-        {/* Account Section */}
-        <SidebarGroup>
-          <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
-            Account
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {accountItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      className={getNavCls(isActive(item.url))}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-               {user && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton onClick={handleSignOut}>
-                    <LogOut className="h-4 w-4" />
-                    {!isCollapsed && <span>Sign Out</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+    <>
+      <DeskSidebar />
+      <div style={{ display: "none" }}>
+        <Sidebar
+          collapsible="icon"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onClick={handleSidebarClick}
+          className={preferClickMode && isCollapsed ? "cursor-pointer" : ""}
+        >
+          <div style={{ display: "none" }}>
+            <SidebarContent className="flex flex-col h-full">
+              {/* Collapse button - only show in click mode when expanded */}
+              {!isCollapsed && preferClickMode && (
+                <div className="p-2 flex justify-end border-b">
+                  <SidebarTrigger />
+                </div>
               )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
-      </SidebarContent>
-    </Sidebar>
+              {/* User Profile Section */}
+              <div className={`p-4 border-b ${isCollapsed ? "px-2" : ""}`}>
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {user?.email?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  {!isCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {user?.email || "Not logged in"}
+                      </p>
+                      {canWrite && (
+                        <p className="text-xs text-muted-foreground">
+                          Growth Access
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Main Navigation */}
+              <SidebarGroup className="flex-1">
+                <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
+                  Dashboard
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {mainNavItems
+                      .filter(
+                        (item) =>
+                          item.title !== "Challenge Tasks" ||
+                          isChallengeParticipant
+                      )
+                      .map((item) => (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton asChild>
+                            <NavLink
+                              to={item.url}
+                              className={getNavCls(
+                                isActive(item.url, item.tab)
+                              )}
+                            >
+                              <item.icon className="h-4 w-4" />
+                              {!isCollapsed && <span>{item.title}</span>}
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+
+              <Separator />
+
+              {/* Secondary Navigation */}
+              <SidebarGroup>
+                <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
+                  Tools
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {secondaryNavItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild>
+                          <NavLink
+                            to={item.url}
+                            className={getNavCls(isActive(item.url))}
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {!isCollapsed && <span>{item.title}</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+
+              <Separator />
+
+              {/* Admin Section - Only show for admin users */}
+              {isAdmin && (
+                <>
+                  <SidebarGroup>
+                    <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
+                      Admin
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        {adminNavItems.map((item) => (
+                          <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton asChild>
+                              <NavLink
+                                to={item.url}
+                                className={getNavCls(isActive(item.url))}
+                              >
+                                <item.icon className="h-4 w-4" />
+                                {!isCollapsed && <span>{item.title}</span>}
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+
+                  <Separator />
+                </>
+              )}
+
+              {/* Account Section */}
+              <SidebarGroup>
+                <SidebarGroupLabel className={isCollapsed ? "sr-only" : ""}>
+                  Account
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {accountItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild>
+                          <NavLink
+                            to={item.url}
+                            className={getNavCls(isActive(item.url))}
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {!isCollapsed && <span>{item.title}</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                    {user && (
+                      <SidebarMenuItem>
+                        <SidebarMenuButton onClick={handleSignOut}>
+                          <LogOut className="h-4 w-4" />
+                          {!isCollapsed && <span>Sign Out</span>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+          </div>
+        </Sidebar>
+      </div>
+    </>
   );
 }

@@ -27,8 +27,8 @@ import { FeedbackDialog } from "@/components/FeedbackDialog";
 const categories = [
   {
     icon: BookOpen,
-    title: "Getting Started",
-    description: "Learn the basics of setting up your account and getting started with PinkWizard.",
+    title: "Getting Started with Network Cultivation",
+    description: "Learn how to set up your network map and start building intentional relationships.",
     faqs: [
       {
         question: "How do I create my account?",
@@ -39,31 +39,27 @@ const categories = [
         answer: "The 75-Day Challenge is PinkWizard's gamified system to build consistent networking habits. Complete daily tasks like adding contacts, logging activities, and attending networking events to earn points and badges."
       },
       {
-        question: "How do I add my first contact?",
-        answer: "Go to the Contacts tab and click 'Add Contact'. Fill in the required fields (name and email) plus any additional information like company, position, phone, LinkedIn URL, and select their category and relationship type."
+        question: "How do I map my network?",
+        answer: "Start by adding contacts and tagging them by relationship type: past clients who could rebook, referral partners who could send leads, strategic allies for collaborations, or donors (for nonprofits). This helps PinkWizard prioritize who to reach out to."
       }
     ]
   },
   {
     icon: Users,
-    title: "Managing Contacts",
-    description: "Organize and track your professional relationships effectively.",
+    title: "Managing Your Network",
+    description: "Organize and track relationship health across your entire network.",
     faqs: [
       {
         question: "What contact information can I store?",
         answer: "Store name, email, company, position, phone, full address, LinkedIn URL, website, social media links (Instagram, Twitter, Facebook, TikTok), plus custom notes and source information."
       },
       {
-        question: "How do contact categories work?",
-        answer: "Choose from 10 categories: Corporate Planner, Wedding Planner, Caterer, DJ, Photographer, HR, Venue, HOA/Leasing, Creator, or Other. This helps you organize and filter your network by industry."
-      },
-      {
         question: "What are relationship types?",
-        answer: "Set relationships as: Lead, Lead Amplifier, Past Client, Friend/Family, Colleague/Associate, Referral Source, or Booked Client. This determines automatic follow-up cadences."
+        answer: "Set relationships as: Past Client, Referral Partner, Strategic Ally, Lead, Donor, Friend/Family, or Booked Client. Each type has smart cadences—past clients get monthly check-ins, referral partners get quarterly touches, donors get gratitude-first communication."
       },
       {
-        question: "How do lead statuses work?",
-        answer: "Track progress with statuses: None, Cold, Warm, Hot, Won, Lost (Maybe Later), or Lost (Not a Fit). Change these as relationships develop."
+        question: "How do I track relationship health?",
+        answer: "Track progress with statuses: Cold, Warm, Hot, Won, Lost (Maybe Later), or Lost (Not a Fit). Change these as relationships develop. PinkWizard will prioritize contacts who are going cold."
       },
       {
         question: "Can I import contacts from a spreadsheet?",
@@ -73,31 +69,31 @@ const categories = [
   },
   {
     icon: MessageSquare,
-    title: "Activities & Outreach",
-    description: "Track interactions and manage follow-ups with your network.",
+    title: "Network Cultivation & Follow-Up",
+    description: "Best practices for nurturing past clients, referral partners, and strategic relationships.",
     faqs: [
       {
         question: "What types of activities can I log?",
         answer: "Log 6 activity types: Email, LinkedIn message, Social media interaction, Phone call, In-person meeting, or Physical mail. Track whether you received a response for each."
       },
       {
-        question: "How do follow-up reminders work?",
-        answer: "PinkWizard automatically suggests follow-up dates based on relationship type and lead status. You can customize the cadence rules in Settings or manually set follow-up dates."
+        question: "How do smart cadences work?",
+        answer: "PinkWizard automatically suggests follow-up dates based on relationship type. Past clients get monthly touches, referral partners get quarterly check-ins, donors get gratitude-focused communication. Customize these in Settings."
       },
       {
-        question: "Can I schedule future activities?",
-        answer: "Yes! When adding an activity, set a future date to schedule it. Scheduled activities appear in your activity list until you mark them complete."
+        question: "How does AI outreach help with network cultivation?",
+        answer: "The AI generates personalized messages for re-engaging past clients, nurturing referral partners, donor communications (nonprofits), and strategic partnership proposals. It references your contact's info and relationship history."
       },
       {
-        question: "How does AI outreach work?",
-        answer: "The AI Outreach tool generates personalized messages based on your contact's category, your business profile, and the type of outreach (cold, warm, follow-up). You can customize tone, goals, and psychological triggers."
+        question: "Can I use this for donor cultivation (nonprofits)?",
+        answer: "Absolutely! Tag donors as a relationship type, set gratitude-first cadences, and use AI to personalize donor updates and cultivation messages at scale."
       }
     ]
   },
   {
     icon: Network,
     title: "Networking Events",
-    description: "Track networking events and the contacts you meet.",
+    description: "Track networking events and nurture the contacts you meet.",
     faqs: [
       {
         question: "How do I log a networking event?",
@@ -109,22 +105,22 @@ const categories = [
       },
       {
         question: "Do networking events count toward my challenge?",
-        answer: "Absolutely! Networking events earn you points in the 75-Day Challenge and help complete daily tasks related to networking and outreach activities."
+        answer: "Absolutely! Networking events earn you points in the 75-Day Challenge and help complete daily tasks related to network growth and relationship building."
       }
     ]
   },
   {
     icon: Trophy,
     title: "Points & Gamification",
-    description: "Understand the points system, badges, and leaderboard.",
+    description: "Understand the points system and how to build network cultivation habits.",
     faqs: [
       {
         question: "How do I earn points?",
-        answer: "Earn points by adding contacts, logging activities, attending networking events, posting in the community, and completing challenge tasks. Different activities have different point values."
+        answer: "Earn points by adding contacts, logging activities, attending networking events, posting in the community, and completing challenge tasks. Relationship cultivation actions earn you consistent points."
       },
       {
         question: "What are badges and how do I earn them?",
-        answer: "Badges are achievements for reaching milestones like adding your first 10 contacts, winning your first deal, or completing networking events. Each badge comes with bonus points."
+        answer: "Badges are achievements for network milestones like adding your first 10 contacts, winning your first deal from a referral, or completing networking events. Each badge comes with bonus points."
       },
       {
         question: "How does the leaderboard work?",
@@ -132,14 +128,14 @@ const categories = [
       },
       {
         question: "Can I see my points history?",
-        answer: "Yes! Your points breakdown shows exactly how you've earned points across different activities, with timestamps and descriptions for each point award."
+        answer: "Yes! Your points breakdown shows exactly how you've earned points across different network cultivation activities, with timestamps and descriptions for each point award."
       }
     ]
   },
   {
     icon: Settings,
     title: "Settings & Customization",
-    description: "Configure your profile, business information, and preferences.",
+    description: "Configure your profile, business information, and relationship cadences.",
     faqs: [
       {
         question: "How do I update my profile?",
@@ -147,11 +143,11 @@ const categories = [
       },
       {
         question: "What is a business profile and why do I need it?",
-        answer: "Your business profile includes your business name, value proposition, industry, target market, and key differentiators. This information helps the AI generate more personalized outreach messages."
+        answer: "Your business profile includes your business name, value proposition, industry, target market, and key differentiators. This information helps the AI generate more personalized outreach messages for network cultivation."
       },
       {
-        question: "Can I customize follow-up cadences?",
-        answer: "Yes! In Settings > Follow-up Settings, you can customize automatic follow-up intervals based on relationship types and lead statuses. Set different cadences for leads vs. past clients, for example."
+        question: "Can I customize follow-up cadences for different relationship types?",
+        answer: "Yes! In Settings > Follow-up Settings, you can customize automatic follow-up intervals. Set monthly touches for past clients, quarterly for referral partners, or custom cadences for donors and strategic allies."
       }
     ]
   },
@@ -214,10 +210,10 @@ export default function Help() {
         <div className="text-center mb-12">
           <Badge variant="secondary" className="mb-4">Help Center</Badge>
           <h1 className="text-4xl font-bold tracking-tight mb-6">
-            How can we help you?
+            How can we help you <em>cultivate your network?</em>
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            Find answers to common questions and learn how to get the most out of PinkWizard.
+            Resources, guides, and support for building relationships that compound.
           </p>
           
           {/* Search */}

@@ -18,6 +18,9 @@ export default {
 			}
 		},
 		extend: {
+			screens: {
+				'xs': '475px',
+			},
 			fontFamily: {
 				'playfair': ['Playfair Display', 'serif'],
 			},
@@ -61,6 +64,7 @@ export default {
 				won: 'hsl(var(--won-lead))',
 				'lost-maybe': 'hsl(var(--lost-maybe-lead))',
 				'lost-not-fit': 'hsl(var(--lost-not-fit-lead))',
+				'brand-pink': 'hsl(var(--brand-pink))',
 				'brand-coral': 'hsl(var(--brand-coral))',
 				'brand-teal-dark': 'hsl(var(--brand-teal-dark))',
 				'brand-magenta': 'hsl(var(--brand-magenta))',

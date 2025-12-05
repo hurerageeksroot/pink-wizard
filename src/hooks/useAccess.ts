@@ -7,9 +7,7 @@ interface AccessState {
   reason: string;
   hasSubscription?: boolean;
   hasPayment?: boolean;
-  hasTrial?: boolean;
   isChallengeParticipant?: boolean;
-  trialEndDate?: string;
   challengeEndDate?: string;
   userDetails?: any;
 }
@@ -43,56 +41,56 @@ export const useAccess = () => {
   const queryClient = useQueryClient();
 
   // Single cached query for access data - optimized for performance
+  // Phase 6: Reduced staleTime to 30 seconds to prevent stale JWT issues
   const { data: accessData, isLoading, error, refetch } = useQuery({
     queryKey: ['access', user?.id],
     queryFn: () => checkAccessData(session),
     enabled: !!user && !!session?.access_token,
-    staleTime: 5 * 60 * 1000, // 5 minutes - reduce frequent checks
-    gcTime: 15 * 60 * 1000, // 15 minutes garbage collection
+    staleTime: 30 * 1000, // 30 seconds - shorter for critical operations
+    gcTime: 5 * 60 * 1000, // 5 minutes garbage collection
     refetchOnWindowFocus: false, // Disable to prevent constant checks
     refetchOnMount: false, // Prevent remount checks
     refetchOnReconnect: true, // Only check on network reconnect
     retry: 1 // Reduce retries
   });
 
+  // Manual session refresh function for recovery scenarios
+  const refreshSession = async () => {
+    try {
+      console.log('[useAccess] Refreshing session manually');
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('[useAccess] Session refresh failed:', error);
+        return false;
+      }
+      
+      console.log('[useAccess] Session refreshed successfully');
+      // Invalidate access query to refetch with new token
+      queryClient.invalidateQueries({ queryKey: ['access', user?.id] });
+      return true;
+    } catch (err) {
+      console.error('[useAccess] Session refresh error:', err);
+      return false;
+    }
+  };
+
+  // UNIVERSAL ACCESS MODE: All authenticated users have write access
+  // Simplified for early-stage application (45 users)
   const accessState: AccessState = {
     hasAccess: accessData?.hasAccess || false,
     reason: accessData?.reason || (error ? 'Error checking access' : 'Not authenticated'),
-    hasSubscription: accessData?.hasSubscription || false,
-    hasPayment: accessData?.hasPayment || false,
-    hasTrial: accessData?.hasTrial || false,
+    hasSubscription: false, // Not tracking subscriptions
+    hasPayment: false, // Not tracking payments
     isChallengeParticipant: accessData?.isChallengeParticipant || false,
-    trialEndDate: accessData?.trialEndDate || null,
-    challengeEndDate: accessData?.challengeEndDate || null,
+    challengeEndDate: null,
     userDetails: accessData?.user || null
   };
 
   const subscriptionState: SubscriptionState = {
-    subscribed: accessData?.hasSubscription || false,
-    subscription_tier: accessData?.subscription_tier || null,
-    subscription_end: accessData?.subscription_end || null
-  };
-
-  const startTrial = async () => {
-    if (!session?.access_token) return null;
-
-    try {
-      const { data, error } = await supabase.functions.invoke('start-trial', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
-
-      if (error) throw error;
-      
-      // Invalidate and refetch access data
-      queryClient.invalidateQueries({ queryKey: ['access', user?.id] });
-      
-      return data;
-    } catch (error) {
-      console.error('Error starting trial:', error);
-      return null;
-    }
+    subscribed: false, // Not tracking subscriptions
+    subscription_tier: null,
+    subscription_end: null
   };
 
   const createCheckout = async () => {
@@ -131,7 +129,8 @@ export const useAccess = () => {
     }
   };
 
-  const canWrite = accessState.hasAccess || subscriptionState.subscribed;
+  // UNIVERSAL ACCESS: All authenticated users can write
+  const canWrite = accessState.hasAccess;
 
   return {
     ...accessState,
@@ -139,7 +138,7 @@ export const useAccess = () => {
     canWrite,
     loading: isLoading,
     checkAccess: refetch,
-    startTrial,
+    refreshSession,
     createCheckout,
     openCustomerPortal
   };

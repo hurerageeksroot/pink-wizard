@@ -19,6 +19,26 @@ interface Database {
           challenge_day: number | null
           created_at: string
         }
+        Insert: {
+          id?: string
+          user_id: string
+          activity_type: string
+          points_earned: number
+          description?: string | null
+          metadata?: any
+          challenge_day?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          activity_type?: string
+          points_earned?: number
+          description?: string | null
+          metadata?: any
+          challenge_day?: number | null
+          created_at?: string
+        }
       }
       profiles: {
         Row: {
@@ -52,11 +72,10 @@ Deno.serve(async (req) => {
 
     console.log('👤 Checking bonuses for user:', userId);
 
-    // Get user's total points
     const { data: pointsData, error: pointsError } = await supabase
       .from('user_points_ledger')
       .select('points_earned')
-      .eq('user_id', userId);
+      .eq('user_id', userId) as { data: Array<{ points_earned: number }> | null; error: any };
 
     if (pointsError) {
       console.error('❌ Error fetching points:', pointsError);
@@ -71,7 +90,7 @@ Deno.serve(async (req) => {
       .from('user_points_ledger')
       .select('*')
       .eq('user_id', userId)
-      .eq('activity_type', 'milestone_bonus');
+      .eq('activity_type', 'milestone_bonus') as { data: Array<{ metadata: any }> | null; error: any };
 
     if (bonusError) {
       console.error('❌ Error fetching existing bonuses:', bonusError);
@@ -97,8 +116,8 @@ Deno.serve(async (req) => {
           console.log(`🎉 Awarding ${bonus} bonus points for ${milestone} milestone!`);
           
           // Use conflict-safe insert for milestone bonus
-          const { data: insertData, error: insertError } = await supabase
-            .from('user_points_ledger')
+          const { data: insertData, error: insertError } = await (supabase
+            .from('user_points_ledger') as any)
             .insert({
               user_id: userId,
               activity_type: 'milestone_bonus',
@@ -156,7 +175,7 @@ Deno.serve(async (req) => {
     console.error('❌ Error in milestone bonus check:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         success: false 
       }),
       { 

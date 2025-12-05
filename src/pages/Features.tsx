@@ -8,55 +8,55 @@ import { useAuth } from "@/contexts/AuthContext";
 const features = [{
   id: "contacts",
   title: "Contacts & Relationships",
-  description: "Organize and track your professional network with precision",
+  description: "Your network at a glance—organized by who they are and where the relationship stands",
   icon: Users,
-  items: ["Comprehensive contact profiles with custom fields", "Relationship status tracking (Cold, Warm, Hot, Won)", "Smart contact categorization and filtering", "Quick notes and interaction history", "Contact search and advanced filtering"]
+  items: ["Tag by relationship type: past clients, referral partners, strategic allies, donors", "Track relationship health—who's going cold, who's hot, who needs nurturing", "Comprehensive profiles with interaction history", "Smart contact categorization and filtering", "Import contacts or add as you go"]
 }, {
   id: "activities",
   title: "Activities & Timeline",
-  description: "Never miss a follow-up with detailed activity tracking",
+  description: "Every touchpoint in one place—because relationships are built in the details",
   icon: Activity,
-  items: ["Log touchpoints across all communication channels", "Automatic follow-up reminders and cadence suggestions", "Response tracking and engagement metrics", "Visual timeline of all interactions", "Activity analytics and insights"]
+  items: ["Log calls, emails, coffee chats, social interactions, event attendance", "See relationship history at a glance before reaching out", "Automatic follow-up reminders based on relationship type", "Response tracking and engagement metrics", "Visual timeline of all interactions"]
 }, {
   id: "tasks",
-  title: "Tasks & Routines",
-  description: "Stay organized with intelligent task management",
+  title: "Smart Cadences & Daily Priorities",
+  description: "Different relationships need different rhythms—know who to reach out to and when",
   icon: CheckSquare,
-  items: ["Daily outreach tasks with smart prioritization", "Follow-up cadence automation and suggestions", "Personal and program-based task creation", "Progress tracking with streak counters", "Weekly goal setting and achievement tracking"]
+  items: ["Past clients: Monthly 'thinking of you' touches", "Referral partners: Quarterly value-sharing and reciprocity", "Strategic allies: Milestone-based check-ins", "Donors: Gratitude-first communication (not just asks)", "Daily prioritization based on relationship health"]
 }, {
   id: "ai-outreach",
   title: "AI Outreach Generation",
-  description: "Create personalized messages with AI assistance",
+  description: "Take the awkwardness out of 'just checking in'—sound like yourself, not a template",
   icon: Sparkles,
-  items: ["AI-powered message generation via token system", "Personalized content based on contact data", "Multiple message variations and A/B testing", "Token-efficient generation (≈1,500 tokens per message)", "Note: Messages generated in-app, not sent directly"]
+  items: ["Generate personalized messages that reference past conversations", "Tone matches your voice, not generic LinkedIn speak", "Re-engage past clients who've gone quiet", "Craft strategic partnership proposals", "Token-efficient generation (≈1,500 tokens per message)"]
 }, {
   id: "analytics",
-  title: "Dashboard & Analytics",
-  description: "Data-driven insights to optimize your outreach",
+  title: "Network ROI & Analytics",
+  description: "Track which relationship investments actually drive business outcomes",
   icon: BarChart3,
-  items: ["Real-time activity dashboards and trends", "Outreach mix analysis and optimization suggestions", "Response rate tracking and conversion metrics", "Leaderboard integration for team motivation", "Custom reporting and performance insights"]
+  items: ["See which relationship types drive the most repeat revenue", "Track which referral partners actually send qualified leads", "Measure donor cultivation effectiveness (nonprofits)", "Activity dashboards and engagement trends", "See your network in dollars, not just contact counts"]
 }, {
   id: "gamification",
   title: "Gamification & Motivation",
-  description: "Stay motivated with points, badges, and rewards",
+  description: "Make relationship cultivation a habit, not a chore",
   icon: Trophy,
-  items: ["Points system for all outreach activities", "Achievement badges and milestone recognition", "Weekly challenges and goal tracking", "Streak counters for consistency building", "Reward notifications and progress celebrations"]
+  items: ["Points for every outreach action—consistency builds compound returns", "Streaks keep you showing up even when you're busy", "Achievement badges and milestone recognition", "See your network investment pay off in real outcomes", "Weekly challenges and goal tracking"]
 }, {
   id: "revenue",
   title: "Revenue & Outcomes",
-  description: "Track deals and measure business impact",
+  description: "Measure the real value of your network cultivation efforts",
   icon: DollarSign,
-  items: ["Won opportunity tracking and revenue recording", "Deal pipeline management and conversion tracking", "ROI analysis on outreach activities", "Revenue goals and achievement tracking", "Business outcome correlation analysis"]
+  items: ["Track repeat revenue from past client relationships", "Measure referrals and their sources", "Won opportunity tracking and deal pipeline", "See which relationship types drive the most business", "ROI analysis on network cultivation activities"]
 }, {
   id: "community",
-  title: "Community & Content",
-  description: "Learn and share with other professionals",
+  title: "Community & Learning",
+  description: "Learn relationship cultivation best practices from other professionals",
   icon: MessageSquare,
-  items: ["Community feed with networking tips and insights", "Resource library with templates and guides", "Best practice sharing and peer learning", "Industry-specific content and strategies", "Expert advice and success stories"]
+  items: ["Community feed with networking strategies and insights", "Relationship cultivation guides and frameworks", "Nonprofit-specific donor cultivation resources", "Referral partner nurturing best practices", "Expert advice and success stories"]
 }, {
   id: "security",
   title: "Security & Access",
-  description: "Enterprise-grade security and data protection",
+  description: "Enterprise-grade security for your most valuable asset—your network data",
   icon: Shield,
   items: ["Supabase-powered authentication and authorization", "Row-level security (RLS) for data isolation", "Least-privilege access controls", "Secure API endpoints with JWT validation", "Regular security audits and compliance monitoring"]
 }];
@@ -82,14 +82,14 @@ export default function Features() {
         <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">
             <Target className="h-4 w-4 mr-2" />
-            Outbound Relationship Management
+            Network Cultivation System
           </Badge>
-          <h1 className="text-4xl font-bold tracking-tight mb-4">Your favorite tool for the most hated tasks.</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-4">Your Network is Your Biggest Asset. <em>Here's how to actually grow it.</em></h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-4">
-            Make outreach feel doable. PinkWizard turns cold starts and forgotten follow‑ups into a simple daily rhythm that grows repeat and referral revenue.
+            PinkWizard combines contact management, smart cadences, and motivational systems to help you intentionally cultivate the relationships that compound.
           </p>
           <p className="text-lg text-muted-foreground/80 max-w-2xl mx-auto mb-8">
-            The cost of silence is compounding—every day a warm contact goes cold, someone else wins the repeat business.
+            Most CRMs help you manage inbound leads. PinkWizard helps you build and nurture the network that creates repeat business, referrals, and opportunities you can't predict.
           </p>
         </div>
 
@@ -101,16 +101,16 @@ export default function Features() {
               <h2 className="text-2xl font-bold mb-6 text-destructive">The problem</h2>
               <div className="space-y-4">
                 <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
-                  <h3 className="font-semibold mb-2">Outreach avoidance</h3>
-                  <p className="text-sm text-muted-foreground">Cold outreach feels awkward—and the blank page is brutal.</p>
+                  <h3 className="font-semibold mb-2">No system for your network</h3>
+                  <p className="text-sm text-muted-foreground">You know networking matters, but you don't have a system for cultivating relationships.</p>
                 </div>
                 <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
-                  <h3 className="font-semibold mb-2">Inconsistent follow‑up</h3>
-                  <p className="text-sm text-muted-foreground">Warm relationships fade without a system.</p>
+                  <h3 className="font-semibold mb-2">Valuable contacts fade</h3>
+                  <p className="text-sm text-muted-foreground">Past clients, referral partners, and strategic allies go quiet without consistent nurturing.</p>
                 </div>
                 <div className="p-4 bg-destructive/5 rounded-lg border border-destructive/20">
-                  <h3 className="font-semibold mb-2">Wrong tool</h3>
-                  <p className="text-sm text-muted-foreground">Traditional tools are built for inbound funnels, not relationship‑led sales.</p>
+                  <h3 className="font-semibold mb-2">Traditional CRMs fail</h3>
+                  <p className="text-sm text-muted-foreground">They're built for managing inbound leads, not cultivating your future network.</p>
                 </div>
               </div>
             </div>
@@ -120,13 +120,13 @@ export default function Features() {
               <h2 className="text-2xl font-bold mb-6 text-orange-600">The consequences</h2>
               <div className="space-y-4">
                 <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm">Missed repeat business from past clients</p>
+                  <p className="text-sm">Past clients forget you exist while you chase new business</p>
                 </div>
                 <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm">"We should catch up soon" that never happens</p>
+                  <p className="text-sm">Referral partners go quiet because you haven't stayed in touch</p>
                 </div>
                 <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm">Invisible pipeline; inconsistent revenue</p>
+                  <p className="text-sm">Your "network" is just a list of contacts gathering digital dust</p>
                 </div>
               </div>
             </div>
@@ -136,16 +136,16 @@ export default function Features() {
               <h2 className="text-2xl font-bold mb-6 text-primary">The solution</h2>
               <div className="space-y-4">
                 <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <h3 className="font-semibold mb-2">Daily Game Plan</h3>
-                  <p className="text-sm text-muted-foreground">Your top 5–10 people to contact, prioritized by relationship and status.</p>
+                  <h3 className="font-semibold mb-2">Map Your Network</h3>
+                  <p className="text-sm text-muted-foreground">Organize by relationship type: past clients, referral partners, strategic allies, donors, friends.</p>
                 </div>
                 <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <h3 className="font-semibold mb-2">Smart Cadence</h3>
-                  <p className="text-sm text-muted-foreground">Relationship‑ and status‑based follow‑ups so no one slips through the cracks.</p>
+                  <h3 className="font-semibold mb-2">Smart Cadences</h3>
+                  <p className="text-sm text-muted-foreground">Different relationships need different rhythms—automated follow-up reminders that match each type.</p>
                 </div>
                 <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <h3 className="font-semibold mb-2">AI Assist + Timeline + Motivation</h3>
-                  <p className="text-sm text-muted-foreground">On‑brand message starters, unified touchpoint tracking, and points that make consistency a habit.</p>
+                  <h3 className="font-semibold mb-2">Track Network ROI</h3>
+                  <p className="text-sm text-muted-foreground">Measure which relationship investments drive repeat revenue, referrals, and partnerships.</p>
                 </div>
               </div>
             </div>
@@ -156,6 +156,7 @@ export default function Features() {
         <div className="mb-20 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg p-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Why PinkWizard is different</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">Built for cultivating your network, not just managing inbound leads</p>
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <div className="flex items-start gap-4">
@@ -163,7 +164,8 @@ export default function Features() {
                 <span className="text-primary font-bold text-sm">✓</span>
               </div>
               <div>
-                <h3 className="font-semibold mb-2">Built for outbound relationship management, not just inbound leads</h3>
+                <h3 className="font-semibold mb-2">Built for OUTBOUND relationship cultivation, not inbound lead management</h3>
+                <p className="text-sm text-muted-foreground">Build the relationships that FILL your funnel</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -171,7 +173,8 @@ export default function Features() {
                 <span className="text-primary font-bold text-sm">✓</span>
               </div>
               <div>
-                <h3 className="font-semibold mb-2">Relationship‑first logic: past clients, strategic partners, referral partners, friends & family—each with the right cadence</h3>
+                <h3 className="font-semibold mb-2">Relationship types that match real life</h3>
+                <p className="text-sm text-muted-foreground">Past clients, referral partners, strategic allies, donors, advocates, and weak ties</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -179,7 +182,8 @@ export default function Features() {
                 <span className="text-primary font-bold text-sm">✓</span>
               </div>
               <div>
-                <h3 className="font-semibold mb-2">Fun and human: a friendly interface that makes outreach feel doable (and even enjoyable)</h3>
+                <h3 className="font-semibold mb-2">Smart cadences for each relationship type</h3>
+                <p className="text-sm text-muted-foreground">Past clients get monthly check-ins, referral partners get quarterly value-adds, donors get gratitude-first communication</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -187,7 +191,8 @@ export default function Features() {
                 <span className="text-primary font-bold text-sm">✓</span>
               </div>
               <div>
-                <h3 className="font-semibold mb-2">Outcomes you care about: track won revenue and referral impact</h3>
+                <h3 className="font-semibold mb-2">Track your network ROI</h3>
+                <p className="text-sm text-muted-foreground">See which relationship investments drive repeat revenue, referrals, and partnerships</p>
               </div>
             </div>
           </div>
@@ -197,19 +202,32 @@ export default function Features() {
         <div className="mb-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Who it's for</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">For anyone whose success depends on relationships, not just transactions</p>
           </div>
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <Card className="p-6">
-              <h3 className="font-semibold mb-2">Event professionals, agencies, and studios</h3>
+              <h3 className="font-semibold mb-2">Small businesses who rely on repeat clients and referrals</h3>
+              <p className="text-sm text-muted-foreground">Your network drives more revenue than ads</p>
             </Card>
             <Card className="p-6">
-              <h3 className="font-semibold mb-2">Consultants and service businesses selling to companies</h3>
+              <h3 className="font-semibold mb-2">Event professionals, agencies, and creative studios</h3>
+              <p className="text-sm text-muted-foreground">Corporate clients rebook when you stay top-of-mind</p>
             </Card>
             <Card className="p-6">
-              <h3 className="font-semibold mb-2">Founders and freelancers growing through relationships</h3>
+              <h3 className="font-semibold mb-2">Consultants, coaches, and service providers</h3>
+              <p className="text-sm text-muted-foreground">Your reputation and referrals are your growth engine</p>
             </Card>
             <Card className="p-6">
-              <h3 className="font-semibold mb-2">Anyone whose next deal is more likely to come from a person they know</h3>
+              <h3 className="font-semibold mb-2">Nonprofits and fundraisers</h3>
+              <p className="text-sm text-muted-foreground">Donor relationships require cultivation, not just asks</p>
+            </Card>
+            <Card className="p-6">
+              <h3 className="font-semibold mb-2">Community organizers and advocates</h3>
+              <p className="text-sm text-muted-foreground">Building movements requires genuine connections</p>
+            </Card>
+            <Card className="p-6">
+              <h3 className="font-semibold mb-2">Anyone building a personal brand</h3>
+              <p className="text-sm text-muted-foreground">Your network is your distribution—and your safety net</p>
             </Card>
           </div>
         </div>
@@ -218,28 +236,29 @@ export default function Features() {
         <div className="mb-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">How it works</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">Three simple steps to cultivate your network</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <div className="text-center">
               <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-primary font-bold">1</span>
               </div>
-              <h3 className="font-semibold mb-2">Import & Tag</h3>
-              <p className="text-muted-foreground text-sm">Import your contacts (or add as you go) and tag relationship + status</p>
+              <h3 className="font-semibold mb-2">Map Your Network</h3>
+              <p className="text-muted-foreground text-sm">Import contacts or add as you go, then tag by relationship type: past clients, referral partners, strategic allies, donors, friends</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-primary font-bold">2</span>
               </div>
-              <h3 className="font-semibold mb-2">Get Recommendations</h3>
-              <p className="text-muted-foreground text-sm">PinkWizard recommends who to reach out to today and why</p>
+              <h3 className="font-semibold mb-2">Get Your Daily Game Plan</h3>
+              <p className="text-muted-foreground text-sm">PinkWizard tells you who to reach out to today based on relationship type, last contact date, and status</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-primary font-bold">3</span>
               </div>
-              <h3 className="font-semibold mb-2">Take Action & Track</h3>
-              <p className="text-muted-foreground text-sm">Use a message starter, log the touchpoint, keep your streak—and watch your warm pipeline grow</p>
+              <h3 className="font-semibold mb-2">Take Action & Track Impact</h3>
+              <p className="text-muted-foreground text-sm">Use AI for message help, log touchpoints, track outcomes—see your network ROI in real revenue and referrals</p>
             </div>
           </div>
         </div>
@@ -247,20 +266,20 @@ export default function Features() {
         {/* Social Proof */}
         <div className="mb-20">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">What people are saying</h2>
+            <h2 className="text-3xl font-bold mb-4">What happens when you invest in your network</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <Card className="p-6">
-              <p className="text-muted-foreground mb-4">"We finally stopped 'meaning to follow up.' PinkWizard made it a habit."</p>
-              <div className="font-semibold">— Name, Company</div>
+              <p className="text-muted-foreground mb-4">"We closed $45K in repeat business by simply staying in touch with past clients monthly."</p>
+              <div className="font-semibold">— Sarah M., Event Planner</div>
             </Card>
             <Card className="p-6">
-              <p className="text-muted-foreground mb-4">"Repeat corporate bookings grew just by staying in touch weekly."</p>
-              <div className="font-semibold">— Name, Role</div>
+              <p className="text-muted-foreground mb-4">"My referral partner network now sends me 3-5 qualified leads per month—without me asking."</p>
+              <div className="font-semibold">— Marcus T., Business Coach</div>
             </Card>
             <Card className="p-6">
-              <p className="text-muted-foreground mb-4">"The first outreach tool that actually makes this feel doable."</p>
-              <div className="font-semibold">— Name, Consultant</div>
+              <p className="text-muted-foreground mb-4">"I thought I was 'networking' on LinkedIn. PinkWizard taught me what intentional relationship building actually looks like."</p>
+              <div className="font-semibold">— Jennifer K., Nonprofit Director</div>
             </Card>
           </div>
         </div>
@@ -311,9 +330,9 @@ export default function Features() {
           <div className="flex justify-center mb-4">
             <Star className="h-12 w-12 text-primary" />
           </div>
-          <h2 className="text-3xl font-bold mb-4">Ready to transform your networking?</h2>
+          <h2 className="text-3xl font-bold mb-4">Ready to cultivate your network?</h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Start with our affordable base plan and add AI tokens as you need them for personalized outreach campaigns.
+            Your network is your most valuable business asset. Start building it intentionally today.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -3,6 +3,9 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { seedSampleDataForUser } from '@/utils/seedData';
 
+// App version for cache busting - increment this when deploying critical fixes
+const APP_VERSION = '1.0.2'; // CRITICAL FIX: Force reload for touchpoint logging diagnostics
+
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -12,6 +15,29 @@ export const useAuth = () => {
 
   useEffect(() => {
     let mounted = true;
+    
+    // Check if app version has changed (force sign out only if DIFFERENT version detected)
+    // Don't sign out if version is missing (first load after cache clear)
+    const storedVersion = localStorage.getItem('app_version');
+    if (storedVersion && storedVersion !== APP_VERSION) {
+      console.warn('[Auth] App version mismatch detected - forcing sign out for clean session', {
+        stored: storedVersion,
+        current: APP_VERSION
+      });
+      localStorage.setItem('app_version', APP_VERSION);
+      // Sign out and reload to ensure clean state
+      supabase.auth.signOut().then(() => {
+        window.location.reload();
+      });
+      return;
+    }
+    // If no stored version, just set it without signing out
+    if (!storedVersion) {
+      console.log('[Auth] First load detected, setting app version:', APP_VERSION);
+      localStorage.setItem('app_version', APP_VERSION);
+    } else {
+      console.log('[Auth] App version verified:', APP_VERSION);
+    }
     
     // Add loading timeout protection
     const loadingTimeout = setTimeout(() => {
@@ -26,13 +52,28 @@ export const useAuth = () => {
       (event, session) => {
         if (!mounted) return;
         
-        console.log(`[Auth] Auth state changed: ${event}`, session?.user?.email || 'No user');
+        console.log(`[Auth] Auth state changed: ${event}`, session?.user?.email || 'No user', 'version:', APP_VERSION);
         
         // Add diagnostics for session events
         if (event === 'SIGNED_OUT') {
           console.log('[Auth] User signed out - could be manual or session collision');
         } else if (event === 'SIGNED_IN') {
           console.log('[Auth] User signed in successfully');
+        }
+        
+        // CRITICAL: Detect session/user ID mismatch and force clean state
+        if (session?.user && user && session.user.id !== user.id) {
+          console.error('[Auth] CRITICAL: Session/User ID mismatch detected!', {
+            existingUserId: user.id,
+            sessionUserId: session.user.id,
+            event
+          });
+          // Force sign out and reload to prevent data corruption
+          console.warn('[Auth] Forcing sign out and reload to fix session mismatch');
+          supabase.auth.signOut().then(() => {
+            window.location.reload();
+          });
+          return;
         }
         
         setSession(session);

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Settings, Users, Target, Sparkles } from 'lucide-react';
+import { CheckCircle, Settings, Users, Target, Sparkles, Sliders } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { RelationshipCategorySelector } from '@/components/RelationshipCategorySelector';
 
 interface WelcomeModalProps {
   open: boolean;
@@ -13,24 +14,35 @@ interface WelcomeModalProps {
 
 export const WelcomeModal: React.FC<WelcomeModalProps> = ({ open, onOpenChange }) => {
   const navigate = useNavigate();
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
 
   const handleStepAction = (action: string) => {
-    onOpenChange(false);
-    
     switch (action) {
+      case 'categories':
+        setShowCategorySelector(true);
+        break;
       case 'profile':
         navigate('/ai-outreach?profile=1');
+        handleClose();
         break;
       case 'import':
         navigate('/?tab=contacts&action=import');
+        handleClose();
         break;
       case 'ready':
         navigate('/?tab=contacts&filter=ready');
+        handleClose();
         break;
       case 'generate':
         navigate('/ai-outreach');
+        handleClose();
         break;
     }
+  };
+
+  const handleCategorySelectionComplete = (selectedCategories: string[]) => {
+    setShowCategorySelector(false);
+    // Categories are automatically enabled by the selector component
   };
 
   const handleClose = () => {
@@ -41,6 +53,14 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ open, onOpenChange }
   };
 
   const steps = [
+    {
+      id: 'categories',
+      title: 'Choose your relationship categories',
+      description: 'Select the types of relationships you want to track in your CRM',
+      icon: Sliders,
+      action: 'categories',
+      buttonText: 'Select Categories'
+    },
     {
       id: 'profile',
       title: 'Set up your business profile',
@@ -75,6 +95,32 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ open, onOpenChange }
     }
   ];
 
+  if (showCategorySelector) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+               <div className="p-2 bg-primary text-primary-foreground rounded-lg">
+                 <Sparkles className="h-6 w-6" />
+               </div>
+              <div>
+                <DialogTitle className="text-2xl">Welcome to PinkWizard ✨</DialogTitle>
+                <DialogDescription className="text-base">
+                  First, let's set up your relationship categories
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <RelationshipCategorySelector 
+            mode="onboarding"
+            onComplete={handleCategorySelectionComplete}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -86,7 +132,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ open, onOpenChange }
             <div>
               <DialogTitle className="text-2xl">Welcome to PinkWizard ✨</DialogTitle>
               <DialogDescription className="text-base">
-                Ready to cast your first follow-up? Let's set up your outreach magic in 4 quick steps.
+                Ready to cast your first follow-up? Let's set up your outreach magic in 5 quick steps.
               </DialogDescription>
             </div>
           </div>

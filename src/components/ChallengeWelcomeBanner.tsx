@@ -16,8 +16,8 @@ export const ChallengeWelcomeBanner: React.FC = () => {
   const { user } = useAuth();
   const { isChallengeParticipant, isActive, startDate, loading } = useChallenge();
 
-  // Don't show if loading, dismissed, not a participant, or no user
-  if (loading || dismissed || !isChallengeParticipant || !user) {
+  // Don't show if loading, dismissed, not a participant, no user, or challenge is inactive
+  if (loading || dismissed || !isChallengeParticipant || !user || !isActive) {
     return null;
   }
 

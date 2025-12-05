@@ -1,7 +1,7 @@
 import { Activity } from "@/types/crm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, MessageCircle, Calendar, Share2, Linkedin, CheckCircle2, Clock, DollarSign, Edit2, UserCheck, MessageSquare, Trash2 } from "lucide-react";
+import { Mail, Phone, MessageCircle, Calendar, Share2, Linkedin, CheckCircle2, Clock, DollarSign, Edit2, UserCheck, MessageSquare, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -32,6 +32,7 @@ export function ActivityTimeline({ activities, contactId, onEditActivity, onDele
       case 'text': return <MessageSquare {...iconProps} />;
       case 'revenue': return <DollarSign {...iconProps} />;
       case 'status_change': return <UserCheck {...iconProps} />;
+      case 'introduction': return <Users {...iconProps} />;
       default: return <MessageCircle {...iconProps} />;
     }
   };
@@ -46,6 +47,7 @@ export function ActivityTimeline({ activities, contactId, onEditActivity, onDele
       case 'text': return 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/20 dark:text-teal-300 dark:border-teal-800';
       case 'revenue': return 'bg-primary/10 text-primary border-primary/20 dark:bg-primary/20 dark:text-primary dark:border-primary/30';
       case 'status_change': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'introduction': return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800';
       default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-300 dark:border-gray-800';
     }
   };
@@ -64,6 +66,19 @@ export function ActivityTimeline({ activities, contactId, onEditActivity, onDele
       {contactActivities.map((activity, index) => {
         const date = activity.completedAt || activity.createdAt;
         const isCompleted = !!activity.completedAt;
+        
+        // Parse introduction data if this is an introduction
+        let introData = null;
+        if (activity.type === 'introduction' && activity.description) {
+          try {
+            const jsonMatch = activity.description.match(/INTRODUCTION_DATA: ({.+})/);
+            if (jsonMatch) {
+              introData = JSON.parse(jsonMatch[1]);
+            }
+          } catch (e) {
+            console.error('Failed to parse introduction data:', e);
+          }
+        }
         
         return (
           <div key={activity.id} className="relative">
@@ -85,7 +100,7 @@ export function ActivityTimeline({ activities, contactId, onEditActivity, onDele
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-sm">{activity.title}</h4>
                       <div className="flex items-center gap-2">
-                        {onEditActivity && activity.type !== 'revenue' && activity.type !== 'status_change' && (
+                        {onEditActivity && activity.type !== 'revenue' && activity.type !== 'status_change' && activity.type !== 'introduction' && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -122,7 +137,14 @@ export function ActivityTimeline({ activities, contactId, onEditActivity, onDele
                       </div>
                     </div>
                     
-                    {activity.description && (
+                    {introData && (
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Connected <span className="font-medium">{introData.contactA?.name || <span className="text-muted-foreground/50">[Contact Deleted]</span>}</span> with <span className="font-medium">{introData.contactB?.name || <span className="text-muted-foreground/50">[Contact Deleted]</span>}</span>
+                        {introData.context && <span> — {introData.context}</span>}
+                      </p>
+                    )}
+                    
+                    {activity.description && activity.type !== 'introduction' && (
                       <p className="text-sm text-muted-foreground mb-2">{activity.description}</p>
                     )}
                     

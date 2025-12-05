@@ -6,6 +6,10 @@
 All colors MUST be HSL.
 */
 
+* {
+  font-family: "Playfair Display", serif;
+}
+
 @layer base {
   :root {
     --background: 210 40% 98%;
@@ -18,39 +22,40 @@ All colors MUST be HSL.
     --popover-foreground: 222.2 84% 4.9%;
 
     /* Brand Colors from Palette */
-    --primary: 338 89% 64%;        /* #f5518d - Light Pink */
+    --primary: 338 89% 64%; /* #f5518d - Light Pink */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 186 100% 28%;     /* #078e92 - Teal */
+    --secondary: 186 100% 28%; /* #078e92 - Teal */
     --secondary-foreground: 0 0% 100%;
 
     --muted: 186 25% 85%;
     --muted-foreground: 186 30% 25%;
 
-    --accent: 37 100% 50%;         /* #f09300 - Orange */
+    --accent: 37 100% 50%; /* #f09300 - Orange */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 186 25% 88%;
-    --input: 186 25% 95%;
+    --border: 186 30% 75%;
+    --input: 0 0% 70%;
     --ring: 338 89% 64%;
 
     /* Extended Brand Palette */
-    --brand-coral: 357 98% 76%;        /* #fd6484 - Light Pink/Coral */
-    --brand-teal-dark: 186 89% 32%;    /* #187187 - Darker Teal */
-    --brand-magenta: 320 84% 43%;      /* #cc116c - Deep Pink/Magenta */
-    --brand-teal-darker: 185 91% 20%;  /* #065867 - Dark Teal */
+    --brand-pink: 338 89% 64%; /* #f5518d - Light Pink */
+    --brand-coral: 357 98% 76%; /* #fd6484 - Light Pink/Coral */
+    --brand-teal-dark: 186 89% 32%; /* #187187 - Darker Teal */
+    --brand-magenta: 320 84% 43%; /* #cc116c - Deep Pink/Magenta */
+    --brand-teal-darker: 185 91% 20%; /* #065867 - Dark Teal */
     --brand-teal-darkest: 186 100% 11%; /* #00343a - Very Dark Teal */
-    --brand-lime: 72 69% 59%;          /* #c7d368 - Green-Yellow/Lime */
-    
+    --brand-lime: 72 69% 59%; /* #c7d368 - Green-Yellow/Lime */
+
     /* Email-specific brand colors */
-    --email-primary: 338 89% 64%;      /* Main brand pink */
-    --email-secondary: 186 100% 28%;   /* Brand teal */
-    --email-accent: 37 100% 50%;       /* Brand orange */
-    --email-background: 0 0% 98%;      /* Light neutral */
-    --email-text: 186 100% 11%;        /* Dark teal for text */
+    --email-primary: 338 89% 64%; /* Main brand pink */
+    --email-secondary: 186 100% 28%; /* Brand teal */
+    --email-accent: 37 100% 50%; /* Brand orange */
+    --email-background: 0 0% 98%; /* Light neutral */
+    --email-text: 186 100% 11%; /* Dark teal for text */
 
     /* Lead Status Colors - Using Brand Colors */
     --cold-lead: 186 100% 28%; /* Secondary - Teal */
@@ -59,23 +64,71 @@ All colors MUST be HSL.
     --won-lead: 72 69% 59%; /* Brand Lime - using brand color */
     --lost-maybe-lead: 45 7% 89%; /* Light Gray */
     --lost-not-fit-lead: 0 84% 60%; /* Destructive Red */
-    
+
     /* Lead Status Background Gradients - Using Brand Colors */
-    --gradient-primary: linear-gradient(135deg, hsl(338 89% 64%), hsl(338 89% 70%));
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(338 89% 64%),
+      hsl(338 89% 70%)
+    );
     --gradient-card: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 98%));
-    --gradient-secondary: linear-gradient(135deg, hsl(186 100% 28%), hsl(186 100% 35%));
-    --gradient-accent: linear-gradient(135deg, hsl(37 100% 50%), hsl(37 100% 55%));
-    --gradient-cold: linear-gradient(135deg, hsl(186 100% 28%), hsl(186 100% 35%)); /* Secondary - Teal */
-    --gradient-warm: linear-gradient(135deg, hsl(37 100% 50%), hsl(37 100% 55%)); /* Accent - Orange */
-    --gradient-hot: linear-gradient(135deg, hsl(338 89% 64%), hsl(338 89% 70%)); /* Primary - Pink */
-    --gradient-won: linear-gradient(135deg, hsl(72 69% 59%), hsl(72 69% 65%)); /* Brand Lime Green */
-    --gradient-lost-maybe: linear-gradient(135deg, hsl(45 7% 89%), hsl(45 7% 92%)); /* Light Gray */
-    --gradient-lost-not-fit: linear-gradient(135deg, hsl(320 84% 43%), hsl(320 84% 48%)); /* Brand Magenta */
-    
+    --gradient-secondary: linear-gradient(
+      135deg,
+      hsl(186 100% 28%),
+      hsl(186 100% 35%)
+    );
+    --gradient-accent: linear-gradient(
+      135deg,
+      hsl(37 100% 50%),
+      hsl(37 100% 55%)
+    );
+    --gradient-cold: linear-gradient(
+      135deg,
+      hsl(186 100% 28%),
+      hsl(186 100% 35%)
+    ); /* Secondary - Teal */
+    --gradient-warm: linear-gradient(
+      135deg,
+      hsl(37 100% 50%),
+      hsl(37 100% 55%)
+    ); /* Accent - Orange */
+    --gradient-hot: linear-gradient(
+      135deg,
+      hsl(338 89% 64%),
+      hsl(338 89% 70%)
+    ); /* Primary - Pink */
+    --gradient-won: linear-gradient(
+      135deg,
+      hsl(72 69% 59%),
+      hsl(72 69% 65%)
+    ); /* Brand Lime Green */
+    --gradient-lost-maybe: linear-gradient(
+      135deg,
+      hsl(45 7% 89%),
+      hsl(45 7% 92%)
+    ); /* Light Gray */
+    --gradient-lost-not-fit: linear-gradient(
+      135deg,
+      hsl(320 84% 43%),
+      hsl(320 84% 48%)
+    ); /* Brand Magenta */
+
     /* Email gradients using brand colors */
-    --gradient-email-header: linear-gradient(135deg, hsl(338 89% 64%), hsl(320 84% 43%)); /* Pink to Magenta */
-    --gradient-email-button: linear-gradient(135deg, hsl(186 100% 28%), hsl(186 89% 32%)); /* Teal gradient */
-    --gradient-email-accent: linear-gradient(135deg, hsl(37 100% 50%), hsl(357 98% 76%)); /* Orange to Coral */
+    --gradient-email-header: linear-gradient(
+      135deg,
+      hsl(338 89% 64%),
+      hsl(320 84% 43%)
+    ); /* Pink to Magenta */
+    --gradient-email-button: linear-gradient(
+      135deg,
+      hsl(186 100% 28%),
+      hsl(186 89% 32%)
+    ); /* Teal gradient */
+    --gradient-email-accent: linear-gradient(
+      135deg,
+      hsl(37 100% 50%),
+      hsl(357 98% 76%)
+    ); /* Orange to Coral */
 
     /* Hover States */
     --hover-subtle: 186 25% 75%;
@@ -83,9 +136,12 @@ All colors MUST be HSL.
     --hover-primary: 338 89% 70%;
 
     /* Shadows */
-    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-card: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
-    --shadow-elevated: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.1),
+      0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-card: 0 4px 6px -1px hsl(0 0% 0% / 0.1),
+      0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-elevated: 0 10px 15px -3px hsl(0 0% 0% / 0.1),
+      0 4px 6px -4px hsl(0 0% 0% / 0.1);
 
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -133,8 +189,8 @@ All colors MUST be HSL.
     --hover-accent: 186 25% 40%;
     --hover-primary: 338 89% 40%;
 
-    --border: 186 25% 15%;
-    --input: 186 25% 12%;
+    --border: 186 25% 25%;
+    --input: 186 20% 8%;
     --ring: 338 89% 84%;
     --sidebar-background: 186 35% 8%;
     --sidebar-foreground: 186 25% 90%;
@@ -157,7 +213,12 @@ All colors MUST be HSL.
   }
 
   /* Apply serif font to all headings */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-playfair;
   }
 

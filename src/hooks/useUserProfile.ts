@@ -10,6 +10,7 @@ export interface UserProfile {
   location?: string;
   company_name?: string;
   show_in_leaderboard: boolean;
+  sidebar_click_to_expand: boolean;
   created_at: string;
   updated_at: string;
 }

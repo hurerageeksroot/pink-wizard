@@ -72,11 +72,10 @@ export default function Contact() {
             Get in Touch
           </Badge>
           <h1 className="text-4xl font-bold tracking-tight mb-6">
-            Contact Our Team
+            Questions about <em>building your network?</em>
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Have questions about PinkWizard? Need help with your account? 
-            We're here to help you succeed with your outreach goals.
+            We're here to help you succeed with relationship-led growth.
           </p>
         </div>
 
@@ -119,6 +118,18 @@ export default function Contact() {
                       <SelectValue placeholder="What can we help you with?" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="network-strategy">
+                        <div className="flex items-center gap-2">
+                          <Lightbulb className="h-4 w-4" />
+                          Network Cultivation Strategy
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="nonprofit">
+                        <div className="flex items-center gap-2">
+                          <HeadphonesIcon className="h-4 w-4" />
+                          Nonprofit/Donor Management
+                        </div>
+                      </SelectItem>
                       <SelectItem value="support">
                         <div className="flex items-center gap-2">
                           <HeadphonesIcon className="h-4 w-4" />
@@ -128,7 +139,7 @@ export default function Contact() {
                       <SelectItem value="billing">
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4" />
-                          Billing Question
+                          Billing & Account
                         </div>
                       </SelectItem>
                       <SelectItem value="feature">
@@ -143,8 +154,7 @@ export default function Contact() {
                           Bug Report
                         </div>
                       </SelectItem>
-                      <SelectItem value="sales">Sales Inquiry</SelectItem>
-                      <SelectItem value="partnership">Partnership</SelectItem>
+                      <SelectItem value="partnership">Partnership Opportunities</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>

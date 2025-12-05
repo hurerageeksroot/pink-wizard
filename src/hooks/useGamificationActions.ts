@@ -30,7 +30,7 @@ export function useGamificationActions() {
         // Handle milestone bonus conflicts gracefully
         if (error.message && (error.message.includes('unique_milestone_bonus') || error.message.includes('milestone'))) {
           console.log('ℹ️ [checkBadges] Milestone bonus already awarded or processing, continuing...');
-          return []; // Return empty array instead of throwing
+          return []; 
         }
         
         throw error;
@@ -38,9 +38,13 @@ export function useGamificationActions() {
 
       console.log(`🏆 [checkBadges] Badge check result for ${user.email}:`, data);
 
+      // Handle both array and object responses from check_and_award_badges
+      const badgesArray = Array.isArray(data) ? data : 
+                         (data && typeof data === 'object' && 'badges_awarded' in data ? (data as any).badges_awarded : []);
+
       // Process new badges
-      if (data && data.length > 0) {
-        data.forEach((badge: any) => {
+      if (badgesArray && badgesArray.length > 0) {
+        badgesArray.forEach((badge: any) => {
           console.log(`🎉 [checkBadges] Processing awarded badge: ${badge.badge_name}`);
           
           // Show toast notification immediately
@@ -61,7 +65,7 @@ export function useGamificationActions() {
         });
 
         // Invalidate relevant caches
-        console.log(`🔄 [checkBadges] Invalidating caches after awarding ${data.length} new badges`);
+        console.log(`🔄 [checkBadges] Invalidating caches after awarding ${badgesArray.length} new badges`);
         queryClient.invalidateQueries({ queryKey: ['badges', user.id] });
         queryClient.invalidateQueries({ queryKey: ['points', user.id] });
         queryClient.invalidateQueries({ queryKey: ['leaderboard'] });
@@ -69,7 +73,7 @@ export function useGamificationActions() {
         console.log(`ℹ️ [checkBadges] No new badges awarded for ${user.email} on event: ${eventType}`);
       }
 
-      return data || [];
+      return badgesArray;
     } catch (error) {
       console.error('❌ [checkBadges] Error checking badges:', error);
       return [];
@@ -89,24 +93,29 @@ export function useGamificationActions() {
 
       if (error) throw error;
 
+      // Handle both array and object responses from process_variable_reward
+      const rewardData = (data && typeof data === 'object' && 'reward' in data) 
+        ? [(data as any).reward] 
+        : (Array.isArray(data) ? data : []);
+
       // Show toast for rewards
-      data?.forEach((reward: any) => {
-        if (reward.reward_earned) {
+      rewardData.forEach((reward: any) => {
+        if (reward.rewarded || reward.reward_earned) {
           toast({
             title: "🎁 Surprise Reward!",
-            description: `You've earned: ${reward.reward_name}`,
+            description: reward.message || `You've earned: ${reward.reward_name || reward.points + ' bonus points!'}`,
             duration: 5000,
           });
         }
       });
 
       // Invalidate relevant caches if any rewards were awarded
-      if (data && data.some((r: any) => r.reward_earned)) {
+      if (rewardData.some((r: any) => r.rewarded || r.reward_earned)) {
         queryClient.invalidateQueries({ queryKey: ['rewards', user.id] });
         queryClient.invalidateQueries({ queryKey: ['points', user.id] });
       }
 
-      return data || [];
+      return rewardData;
     } catch (error) {
       console.error('Error processing variable reward:', error);
       return [];

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Activity, Contact, ActivityType } from "@/types/crm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,16 +13,18 @@ import { cn } from "@/lib/utils";
 import { ActivityViewDialog } from "./ActivityViewDialog";
 import { ActivityDialog } from "./ActivityDialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ActivitiesTableProps {
   activities: Activity[];
   contacts: Contact[];
   onActivityUpdate?: (updatedActivity: Activity) => void;
   onActivityDelete?: (activityId: string) => void;
+  onRefresh?: () => void;
 }
 
-export function ActivitiesTable({ activities, contacts, onActivityUpdate, onActivityDelete }: ActivitiesTableProps) {
-  console.log('ActivitiesTable received:', activities.length, 'activities');
+export function ActivitiesTable({ activities, contacts, onActivityUpdate, onActivityDelete, onRefresh }: ActivitiesTableProps) {
+  console.log('📊 ActivitiesTable received:', activities.length, 'activities');
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
@@ -35,6 +37,19 @@ export function ActivitiesTable({ activities, contacts, onActivityUpdate, onActi
     from: undefined,
     to: undefined
   });
+  const [newActivityAdded, setNewActivityAdded] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef(activities.length);
+
+  // Detect when new activities are added and show success banner
+  useEffect(() => {
+    if (activities.length > prevCountRef.current && prevCountRef.current > 0) {
+      setNewActivityAdded(true);
+      tableRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => setNewActivityAdded(false), 3000);
+    }
+    prevCountRef.current = activities.length;
+  }, [activities.length]);
 
   const handleRowClick = (activity: Activity, e: React.MouseEvent) => {
     // Don't open view dialog if edit button was clicked
@@ -61,7 +76,7 @@ export function ActivitiesTable({ activities, contacts, onActivityUpdate, onActi
   };
 
   const handleSaveActivity = async (activityData: any) => {
-    if (!editingActivity || !onActivityUpdate) return;
+    if (!editingActivity || !onActivityUpdate) return false;
 
     const updatedActivity: Activity = {
       ...editingActivity,
@@ -76,6 +91,7 @@ export function ActivitiesTable({ activities, contacts, onActivityUpdate, onActi
     onActivityUpdate(updatedActivity);
     setShowEditDialog(false);
     setEditingActivity(null);
+    return true;
   };
 
   const handleToggleResponse = (activity: Activity, e: React.MouseEvent) => {
@@ -172,11 +188,70 @@ export function ActivitiesTable({ activities, contacts, onActivityUpdate, onActi
   // Progressive rendering for large datasets
   const displayedActivities = filteredActivities.slice(0, visibleCount);
   const hasMoreActivities = filteredActivities.length > visibleCount;
+  
+  // Debug logging for filtering
+  console.log('📊 Activities filtering:', {
+    total: activities.length,
+    filtered: filteredActivities.length,
+    displayed: displayedActivities.length,
+    hasFilters: !!(searchTerm || typeFilter !== 'all' || dateRange.from || dateRange.to)
+  });
 
   return (
     <Card className="bg-gradient-card border-0 shadow-card">
       <CardHeader>
-        <CardTitle>All Activities ({activities.length} total)</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            All Activities 
+            <span className="text-sm font-normal text-muted-foreground">
+              ({filteredActivities.length} of {activities.length} showing)
+            </span>
+          </CardTitle>
+          {onRefresh && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRefresh}
+              className="gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              </svg>
+              Refresh
+            </Button>
+          )}
+        </div>
+        
+        {/* Success banner for new activity */}
+        {newActivityAdded && (
+          <Alert className="mt-4 border-green-500 bg-green-50 dark:bg-green-950/20 animate-fade-in">
+            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertDescription className="text-green-800 dark:text-green-200 font-medium">
+              ✓ New touchpoint added!
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {/* Warning if activities exist but filters hide them */}
+        {activities.length > 0 && filteredActivities.length === 0 && (
+          <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+              ⚠️ You have {activities.length} activities, but your filters are hiding them all.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm("");
+                setTypeFilter("all");
+                setDateRange({ from: undefined, to: undefined });
+              }}
+              className="mt-2"
+            >
+              Clear All Filters
+            </Button>
+          </div>
+        )}
         
         {/* Filters */}
         <div className="flex flex-col gap-4">
@@ -283,15 +358,35 @@ export function ActivitiesTable({ activities, contacts, onActivityUpdate, onActi
         </div>
       </CardHeader>
       
-      <CardContent>
+      <CardContent ref={tableRef} className="scroll-smooth overflow-y-auto max-h-[600px]">
         {filteredActivities.length === 0 ? (
-          <div className="text-center py-8">
-            <MessageCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">
-              {searchTerm || typeFilter !== 'all' || dateRange.from || dateRange.to
-                ? "No activities match your filters" 
-                : "No touchpoints recorded yet"}
-            </p>
+          <div className="text-center py-12 space-y-4">
+            <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto" />
+            <div className="space-y-2">
+              <p className="text-lg font-medium">
+                {searchTerm || typeFilter !== 'all' || dateRange.from || dateRange.to
+                  ? "No activities match your filters" 
+                  : "No touchpoints recorded yet"}
+              </p>
+              {(searchTerm || typeFilter !== 'all' || dateRange.from || dateRange.to) && activities.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Showing 0 of {activities.length} total activities
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setTypeFilter("all");
+                      setDateRange({ from: undefined, to: undefined });
+                    }}
+                    className="mt-2"
+                  >
+                    Clear All Filters
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div>

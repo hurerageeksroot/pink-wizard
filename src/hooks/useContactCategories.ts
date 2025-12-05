@@ -1,42 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactCategory, ContactCategoryCreate } from '@/types/contactCategory';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useContactCategories() {
-  const [categories, setCategories] = useState<ContactCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const loadCategories = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      // First, ensure categories are seeded and contacts are backfilled
+  // Main query - seeds and fetches categories with shared cache
+  const { data: categories = [], isLoading: loading } = useQuery({
+    queryKey: ['contactCategories', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      // Seed categories and backfill contacts
       const { error: seedError } = await supabase.rpc('seed_user_categories_and_backfill', {
         user_id_param: user.id
       });
-
+      
       if (seedError) {
-        console.error('Error seeding categories:', seedError);
+        console.error('[useContactCategories] Error seeding categories:', seedError);
       }
-
-      // Now fetch the categories
+      
+      // Fetch categories
       const { data, error } = await supabase
         .from('user_contact_categories')
         .select('*')
         .eq('user_id', user.id)
         .order('is_default', { ascending: false })
         .order('created_at');
-
+      
       if (error) throw error;
-
-      const formattedCategories: ContactCategory[] = (data || []).map(cat => ({
+      
+      return (data || []).map(cat => ({
         id: cat.id,
         name: cat.name,
         label: cat.label,
@@ -46,24 +44,18 @@ export function useContactCategories() {
         createdAt: new Date(cat.created_at),
         updatedAt: new Date(cat.updated_at),
       }));
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    retry: 1,
+  });
 
-      setCategories(formattedCategories);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load contact categories',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addCategory = async (categoryData: ContactCategoryCreate) => {
-    if (!user) return null;
-
-    try {
+  // Add category mutation
+  const addCategoryMutation = useMutation({
+    mutationFn: async (categoryData: ContactCategoryCreate) => {
+      if (!user) throw new Error('No user');
+      
       const { data, error } = await supabase
         .from('user_contact_categories')
         .insert({
@@ -76,10 +68,10 @@ export function useContactCategories() {
         })
         .select()
         .single();
-
+      
       if (error) throw error;
-
-      const newCategory: ContactCategory = {
+      
+      return {
         id: data.id,
         name: data.name,
         label: data.label,
@@ -89,128 +81,117 @@ export function useContactCategories() {
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
       };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contactCategories', user?.id] });
+      toast({ title: 'Success', description: 'Category added successfully' });
+    },
+    onError: (error) => {
+      console.error('[useContactCategories] Error adding category:', error);
+      toast({ title: 'Error', description: 'Failed to add category', variant: 'destructive' });
+    },
+  });
 
-      setCategories(prev => [...prev, newCategory]);
+  // Delete category mutation
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (!user) throw new Error('No user');
       
-      toast({
-        title: 'Success',
-        description: 'Category added successfully',
-      });
-
-      return newCategory;
-    } catch (error) {
-      console.error('Error adding category:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add category',
-        variant: 'destructive',
-      });
-      return null;
-    }
-  };
-
-  const deleteCategory = async (categoryId: string) => {
-    if (!user) return false;
-
-    try {
       const categoryToDelete = categories.find(cat => cat.id === categoryId);
-      if (!categoryToDelete) return false;
-
-      // Prevent deletion of uncategorized
+      if (!categoryToDelete) throw new Error('Category not found');
+      
       if (categoryToDelete.name === 'uncategorized') {
-        toast({
-          title: 'Cannot Delete',
-          description: 'The "Uncategorized" category cannot be deleted',
-          variant: 'destructive',
-        });
-        return false;
+        throw new Error('Cannot delete uncategorized');
       }
-
-      // Check how many contacts use this category
+      
+      // Check and update contacts
       const { count, error: countError } = await supabase
         .from('contacts')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('category', categoryToDelete.name);
-
+      
       if (countError) throw countError;
-
-      // Update all contacts with this category to 'uncategorized'
+      
       if (count && count > 0) {
         const { error: updateError } = await supabase
           .from('contacts')
           .update({ category: 'uncategorized' })
           .eq('user_id', user.id)
           .eq('category', categoryToDelete.name);
-
+        
         if (updateError) throw updateError;
       }
-
-      // Delete the category
+      
+      // Delete category
       const { error } = await supabase
         .from('user_contact_categories')
         .delete()
         .eq('id', categoryId)
         .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      setCategories(prev => prev.filter(cat => cat.id !== categoryId));
       
-      const contactMessage = count && count > 0 
-        ? ` ${count} contact${count === 1 ? '' : 's'} moved to "Uncategorized".` 
+      if (error) throw error;
+      
+      return { count };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['contactCategories', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['crmData', user?.id] }); // Contacts updated
+      
+      const contactMessage = data.count && data.count > 0 
+        ? ` ${data.count} contact${data.count === 1 ? '' : 's'} moved to "Uncategorized".` 
         : '';
       
-      toast({
+      toast({ 
         title: 'Success', 
-        description: `Category deleted successfully.${contactMessage}`,
+        description: `Category deleted successfully.${contactMessage}` 
       });
+    },
+    onError: (error: any) => {
+      if (error.message === 'Cannot delete uncategorized') {
+        toast({
+          title: 'Cannot Delete',
+          description: 'The "Uncategorized" category cannot be deleted',
+          variant: 'destructive',
+        });
+      } else {
+        console.error('[useContactCategories] Error deleting category:', error);
+        toast({ title: 'Error', description: 'Failed to delete category', variant: 'destructive' });
+      }
+    },
+  });
 
-      return true;
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete category',
-        variant: 'destructive',
-      });
-      return false;
-    }
-  };
-
+  // Helper functions
   const getCategoryByName = (name: string) => {
     return categories.find(cat => cat.name === name);
   };
 
   const getContactCountForCategory = async (categoryName: string) => {
     if (!user) return 0;
-
+    
     try {
       const { count, error } = await supabase
         .from('contacts')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('category', categoryName);
-
+      
       if (error) throw error;
       return count || 0;
     } catch (error) {
-      console.error('Error getting contact count:', error);
+      console.error('[useContactCategories] Error getting contact count:', error);
       return 0;
     }
   };
 
-  useEffect(() => {
-    loadCategories();
-  }, [user]);
-
+  // Public API (same interface as before - no breaking changes)
   return {
     categories,
     loading,
-    addCategory,
-    deleteCategory,
+    addCategory: (categoryData: ContactCategoryCreate) => addCategoryMutation.mutateAsync(categoryData),
+    deleteCategory: (categoryId: string) => deleteCategoryMutation.mutateAsync(categoryId),
     getCategoryByName,
     getContactCountForCategory,
-    reload: loadCategories,
+    reload: () => queryClient.invalidateQueries({ queryKey: ['contactCategories', user?.id] }),
   };
 }

@@ -25,25 +25,49 @@ export const useGlobalData = () => {
   return context;
 };
 
-const fetchGlobalData = async (userId: string) => {
-  const [contactsResult, challengeResult] = await Promise.all([
-    supabase
-      .from('contacts')
-      .select('id', { count: 'exact', head: true }) // Use head-only count query
-      .eq('user_id', userId)
-      .limit(1),
-    supabase
-      .from('user_challenge_progress')
-      .select('is_active', { count: 'exact', head: true }) // Use head-only count query  
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .limit(1)
-  ]);
+// In-flight request deduplication to prevent duplicate API calls
+const inflightRequests = new Map<string, Promise<any>>();
 
-  return {
-    hasContacts: (contactsResult.count || 0) > 0,
-    challengeParticipant: (challengeResult.count || 0) > 0
-  };
+const fetchGlobalData = async (userId: string) => {
+  const cacheKey = `globalData-${userId}`;
+  
+  // Return existing in-flight request if available
+  if (inflightRequests.has(cacheKey)) {
+    console.log('[useGlobalData] Using in-flight request for', userId);
+    return inflightRequests.get(cacheKey)!;
+  }
+  
+  // Create new request
+  console.log('[useGlobalData] Creating new request for', userId);
+  const promise = (async () => {
+    try {
+      const [contactsResult, challengeResult] = await Promise.all([
+        supabase
+          .from('contacts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .limit(1),
+        supabase
+          .from('user_challenge_progress')
+          .select('is_active', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .limit(1)
+      ]);
+
+      return {
+        hasContacts: (contactsResult.count || 0) > 0,
+        challengeParticipant: (challengeResult.count || 0) > 0
+      };
+    } finally {
+      // Clean up after request completes
+      inflightRequests.delete(cacheKey);
+    }
+  })();
+  
+  // Store in-flight request
+  inflightRequests.set(cacheKey, promise);
+  return promise;
 };
 
 export const useGlobalDataProvider = () => {

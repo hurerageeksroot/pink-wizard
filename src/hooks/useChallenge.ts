@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,38 +60,45 @@ export const useChallenge = () => {
     queryKey: ['challengeParticipant', user?.id],
     queryFn: () => fetchUserChallengeProgress(user!.id),
     enabled: !!user,
-    staleTime: 30 * 1000, // Reduce to 30 seconds for faster updates
+    staleTime: 5 * 60 * 1000, // 5 minutes for stability
     gcTime: 15 * 60 * 1000, // 15 minutes garbage collection
-    refetchOnWindowFocus: true, // Allow refetch on focus to pick up changes
-    refetchOnMount: false,
+    refetchOnWindowFocus: false, // Disable to prevent unnecessary refetches
+    refetchOnMount: true, // CRITICAL: Enable to ensure data loads on mount after cache clear
     refetchOnReconnect: false,
-    retry: 0 // Don't retry failed requests
+    retry: 1 // Allow one retry for network issues
   });
 
-  const checkChallengeState = async (force = false) => {
+  const loading = statusLoading || participantLoading;
+  const participant = isChallengeParticipant ?? false;
+
+  const checkChallengeState = useCallback(async (force = false) => {
     // Refetch the participant status from React Query
     if (force || !participant) {
-      console.log('[useChallenge] Force refetching challenge participant status');
       await refetchParticipant();
     }
-  };
+  }, [participant, refetchParticipant]);
 
-  const loading = statusLoading || participantLoading;
-  const participant = isChallengeParticipant || false;
-
-  const state: ChallengeState = {
+  const state: ChallengeState = useMemo(() => ({
     isActive: challengeStatus.isActive,
-    hasAccess: challengeStatus.hasAccess && participant, // Only participants have access
+    hasAccess: challengeStatus.hasAccess && participant,
     currentDay: challengeStatus.currentDay,
     startDate: challengeStatus.startDate,
     endDate: challengeStatus.endDate,
     totalDays: challengeStatus.totalDays,
     isChallengeParticipant: participant
-  };
+  }), [
+    challengeStatus.isActive,
+    challengeStatus.hasAccess,
+    challengeStatus.currentDay,
+    challengeStatus.startDate,
+    challengeStatus.endDate,
+    challengeStatus.totalDays,
+    participant
+  ]);
 
-  return {
+  return useMemo(() => ({
     ...state,
     loading,
     refetch: checkChallengeState
-  };
+  }), [state, loading, checkChallengeState]);
 };

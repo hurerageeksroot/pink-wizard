@@ -10,6 +10,11 @@ import ComprehensiveAnalytics from '@/pages/Admin/ComprehensiveAnalytics';
 import ContentManagement from '@/pages/Admin/ContentManagement';
 import { Settings } from '@/pages/Admin/Settings';
 import ChallengeAudit from '@/pages/Admin/ChallengeAudit';
+import { RelationshipStatusManager } from '@/components/Admin/RelationshipStatusManager';
+import { Security } from '@/pages/Admin/Security';
+import WaitlistManagement from '@/pages/Admin/WaitlistManagement';
+import DataExport from '@/pages/Admin/DataExport';
+import DataImport from '@/pages/Admin/DataImport';
 
 export default function AdminRoutes() {
   return (
@@ -23,7 +28,12 @@ export default function AdminRoutes() {
         <Route path="analytics" element={<ComprehensiveAnalytics />} />
         <Route path="content" element={<ContentManagement />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="relationships" element={<RelationshipStatusManager />} />
         <Route path="challenge-audit" element={<ChallengeAudit />} />
+        <Route path="security" element={<Security />} />
+        <Route path="waitlist" element={<WaitlistManagement />} />
+        <Route path="data-export" element={<DataExport />} />
+        <Route path="data-import" element={<DataImport />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>

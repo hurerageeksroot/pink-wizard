@@ -49,7 +49,9 @@ export const useLeaderboard = () => {
         .from('leaderboard_stats')
         .select('*')
         .not('rank_position', 'is', null)
-        .order('rank_position', { ascending: true })
+        .order('overall_progress', { ascending: false })
+        .order('total_days_completed', { ascending: false })
+        .order('current_streak', { ascending: false })
         .limit(50);
 
       if (error) throw error;
@@ -157,13 +159,14 @@ export const useLeaderboard = () => {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'contacts'
+          table: 'contacts',
+          filter: 'revenue_amount=gt.0'
         },
         () => {
-          // Refresh when contacts are updated (for revenue tracking)
-          setTimeout(fetchAllLeaderboards, 1000);
+          console.log('[Leaderboard] Contact revenue updated, refreshing revenue leaderboard');
+          setTimeout(fetchRevenueLeaderboard, 500);
         }
       )
       .subscribe();

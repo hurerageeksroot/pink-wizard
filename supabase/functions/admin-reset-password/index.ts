@@ -101,14 +101,34 @@ const handler = async (req: Request): Promise<Response> => {
     
     if (getUserError) {
       console.error('[admin-reset-password] Error fetching users:', getUserError);
-      throw new Error('Failed to fetch users');
+      return new Response(
+        JSON.stringify({ 
+          error: 'An error occurred processing your request',
+          code: 'OPERATION_FAILED',
+          success: false
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const targetUser = users.find(u => u.email === email);
     
     if (!targetUser) {
       console.error('[admin-reset-password] User not found:', email);
-      throw new Error(`User not found`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'An error occurred processing your request',
+          code: 'OPERATION_FAILED',
+          success: false
+        }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     // Update user password

@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import Papa from "papaparse";
 import { Contact, Activity, TouchpointType, LeadStatus, RelationshipType } from "@/types/crm";
 import { StatusBadge } from "./StatusBadge";
-import { RelationshipBadge } from "./RelationshipBadge";
 import { ContactCategoryBadge } from "./ContactCategoryBadge";
+import { EnhancedRelationshipBadge } from "./EnhancedRelationshipBadge";
+import { EnhancedRelationshipStatusBadge } from "./EnhancedRelationshipStatusBadge";
+import { ContactContextTags } from "./ContactContextTags";
 import { DemoContactIndicator } from "./DemoContactIndicator";
 import { ActivityDialog } from "./ActivityDialog";
 import { ActivityTimeline } from "./ActivityTimeline";
@@ -15,10 +17,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/hooks/useAccess";
+import { useAIQuota } from "@/hooks/useAIQuota";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { 
   Search, 
@@ -49,17 +55,21 @@ import {
   DollarSign,
   ChevronUp,
   ChevronDown,
-  ChevronsUpDown
+  ChevronsUpDown,
+  AlertCircle,
+  X
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useContactCategories } from "@/hooks/useContactCategories";
+import { useEnhancedRelationshipTypes } from "@/hooks/useEnhancedRelationshipTypes";
+import { ContactRevenueDisplay } from "./ContactRevenueDisplay";
 
 interface ContactListProps {
   contacts: Contact[];
   activities: Activity[];
   onContactSelect: (contact: Contact) => void;
   onAddContact: () => void;
-  onImportContacts: (contacts: Partial<Contact>[]) => void;
+  onImportContacts: (contacts: Partial<Contact>[]) => Promise<{ contactIds: string[] }>;
   onUpdateContactStatus: (contactId: string, status: Contact['status']) => void;
   onUpdateContactRelationship: (contactId: string, relationshipType: Contact['relationshipType']) => void;
   onToggleResponse: (contactId: string) => void;
@@ -112,11 +122,15 @@ export function ContactList({
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [showArchived, setShowArchived] = useState(false);
+  const [showInstagramOnly, setShowInstagramOnly] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedContactForHistory, setSelectedContactForHistory] = useState<Contact | null>(null);
   const [selectedContactForDeletion, setSelectedContactForDeletion] = useState<Contact | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    return localStorage.getItem('leadAmplifierBannerDismissed') === 'true';
+  });
   
   // Bulk actions state
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
@@ -125,6 +139,7 @@ export function ContactList({
   const [newCategory, setNewCategory] = useState<string>('');
   const [newRelationshipType, setNewRelationshipType] = useState<RelationshipType>('lead');
   const [newStatus, setNewStatus] = useState<LeadStatus>('none');
+  const [isEnriching, setIsEnriching] = useState(false);
   
   // Sorting state
   const [sortBy, setSortBy] = useState<string>('');
@@ -135,7 +150,9 @@ export function ContactList({
   
   const { canWrite } = useAccess();
   const { toast } = useToast();
+  const { canMakeRequest, quota } = useAIQuota();
   const { categories } = useContactCategories();
+  const { relationshipTypes } = useEnhancedRelationshipTypes();
   const navigate = useNavigate();
   const timeoutRef = useRef<number | null>(null);
   
@@ -171,6 +188,44 @@ export function ContactList({
     }
   }, [urlFilter]);
 
+  // Track if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return searchTerm !== '' || 
+           statusFilter !== 'all' || 
+           relationshipFilter !== 'all' || 
+           categoryFilter !== 'all' ||
+           showArchived === true ||
+           showInstagramOnly === true;
+  }, [searchTerm, statusFilter, relationshipFilter, categoryFilter, showArchived]);
+
+  // Detect potentially miscategorized contacts
+  const potentialMiscategorized = useMemo(() => {
+    return contacts.filter(c => c.relationshipType === 'lead_amplifier');
+  }, [contacts]);
+
+  // Clear all filters function
+  const handleClearAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setRelationshipFilter('all');
+    setCategoryFilter('all');
+    setShowArchived(false);
+    setShowInstagramOnly(false);
+    
+    // Also clear URL filter parameter
+    const url = new URL(window.location.href);
+    url.searchParams.delete('filter');
+    window.history.replaceState({}, '', url.toString());
+    
+    console.log('[ContactList] All filters cleared');
+    
+    toast({
+      title: "Filters Cleared",
+      description: `Now showing all ${contacts.length} contacts`,
+      duration: 2000,
+    });
+  };
+
   // Filter contacts based on search term and filters
   const filteredContacts = useMemo(() => {
     let filtered = [...contacts];
@@ -180,7 +235,7 @@ export function ContactList({
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(contact =>
         contact.name.toLowerCase().includes(searchLower) ||
-        contact.email.toLowerCase().includes(searchLower) ||
+        (contact.email && contact.email.toLowerCase().includes(searchLower)) ||
         (contact.company && contact.company.toLowerCase().includes(searchLower)) ||
         (contact.position && contact.position.toLowerCase().includes(searchLower)) ||
         (contact.notes && contact.notes.toLowerCase().includes(searchLower))
@@ -213,8 +268,15 @@ export function ContactList({
       filtered = filtered.filter(contact => !contact.archived);
     }
 
+    // Apply Instagram filter
+    if (showInstagramOnly) {
+      filtered = filtered.filter(c => 
+        c.socialMediaLinks?.instagram && !c.email
+      );
+    }
+
     return filtered;
-  }, [contacts, searchTerm, statusFilter, relationshipFilter, categoryFilter, showArchived]);
+  }, [contacts, searchTerm, statusFilter, relationshipFilter, categoryFilter, showArchived, showInstagramOnly]);
 
   // Event handlers
   const handleLogTouchpoint = (contact: Contact) => {
@@ -283,10 +345,19 @@ export function ContactList({
 
   const confirmBulkAction = async () => {
     try {
+      const actionCount = selectedContacts.length;
+      
       if (bulkActionType === 'change-category' && newCategory && onBulkChangeCategory) {
         await onBulkChangeCategory(selectedContacts, newCategory);
       } else if (bulkActionType === 'change-relationship' && onBulkChangeRelationship) {
         await onBulkChangeRelationship(selectedContacts, newRelationshipType);
+        
+        // Enhanced success toast for relationship changes
+        const typeName = relationshipTypes.find(t => t.name === newRelationshipType)?.label || newRelationshipType;
+        toast({
+          title: "✨ Bulk Update Complete!",
+          description: `Successfully updated ${actionCount} contact${actionCount > 1 ? 's' : ''} to "${typeName}"`,
+        });
       } else if (bulkActionType === 'change-status' && onBulkChangeStatus) {
         await onBulkChangeStatus(selectedContacts, newStatus);
       } else if (bulkActionType === 'delete-contacts' && onBulkDeleteContacts) {
@@ -305,6 +376,111 @@ export function ContactList({
       console.error('Bulk action failed:', error);
       // Error toasts are handled by parent handlers
     }
+  };
+
+  const handleBulkEnrich = async () => {
+    // Filter for contacts that have Instagram but no email
+    const contactsToEnrich = selectedContacts
+      .map(id => contacts.find(c => c.id === id))
+      .filter((c): c is Contact => 
+        c !== undefined && 
+        !!c.socialMediaLinks?.instagram && 
+        !c.email
+      );
+    
+    if (contactsToEnrich.length === 0) {
+      toast({
+        title: "No Contacts to Enrich",
+        description: "Selected contacts either don't have Instagram handles or already have emails.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Estimate cost and tokens
+    const estimatedTokensPerContact = 2000;
+    const totalTokens = contactsToEnrich.length * estimatedTokensPerContact;
+    const estimatedCost = (totalTokens / 1000) * 0.01; // Approximate $0.01 per 1k tokens
+
+    // Check if user can afford this
+    if (!canMakeRequest(estimatedTokensPerContact)) {
+      toast({
+        title: "Insufficient AI Quota",
+        description: `You need approximately ${totalTokens.toLocaleString()} tokens to enrich ${contactsToEnrich.length} contacts. Current quota: ${quota?.remaining || 0}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Show confirmation dialog with cost estimate
+    const confirmed = window.confirm(
+      `Enrich ${contactsToEnrich.length} Instagram contact${contactsToEnrich.length > 1 ? 's' : ''}?\n\n` +
+      `Estimated tokens: ${totalTokens.toLocaleString()}\n` +
+      `Estimated cost: ~$${estimatedCost.toFixed(2)}\n` +
+      `Current quota: ${quota?.remaining?.toLocaleString() || 'Unknown'} tokens\n\n` +
+      `This will scrape their Instagram profiles and extract contact information from their bios.`
+    );
+
+    if (!confirmed) return;
+
+    setIsEnriching(true);
+    let completed = 0;
+    let failed = 0;
+
+    toast({
+      title: "Starting Enrichment",
+      description: `Processing ${contactsToEnrich.length} contact${contactsToEnrich.length > 1 ? 's' : ''}...`,
+    });
+
+    for (const contact of contactsToEnrich) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          throw new Error('No valid session');
+        }
+
+        const response = await supabase.functions.invoke('research-contact', {
+          body: { contactId: contact.id },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (response.error) {
+          console.error(`Failed to enrich ${contact.name}:`, response.error);
+          failed++;
+        } else {
+          completed++;
+          console.log(`Successfully enriched ${contact.name}`);
+        }
+
+        // Show progress toast every 5 contacts or on last contact
+        if (completed % 5 === 0 || completed + failed === contactsToEnrich.length) {
+          toast({
+            title: `Enriching... (${completed + failed}/${contactsToEnrich.length})`,
+            description: `✓ ${completed} completed${failed > 0 ? `, ✗ ${failed} failed` : ''}`,
+          });
+        }
+
+        // Rate limiting: wait 2 seconds between requests to avoid overwhelming services
+        if (completed + failed < contactsToEnrich.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (error) {
+        console.error(`Error enriching contact ${contact.name}:`, error);
+        failed++;
+      }
+    }
+
+    setIsEnriching(false);
+    setSelectedContacts([]); // Clear selection after completion
+
+    // Final summary toast
+    toast({
+      title: "Enrichment Complete",
+      description: `✓ ${completed} contact${completed !== 1 ? 's' : ''} enriched successfully${failed > 0 ? `, ✗ ${failed} failed` : ''}. Check the contact research panels for extracted information.`,
+      duration: 5000,
+    });
   };
 
   // Export functionality
@@ -364,6 +540,86 @@ export function ContactList({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="space-y-6">
+        {/* Active Filter Warning Banner */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 rounded-lg border border-amber-200 dark:border-amber-700">
+            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                Active Filters
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                Showing {filteredContacts.length} of {contacts.length} contacts
+                {filteredContacts.length < contacts.length && (
+                  <span className="font-medium"> • {contacts.length - filteredContacts.length} hidden</span>
+                )}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearAllFilters}
+              className="border-amber-300 hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/40 flex-shrink-0"
+            >
+              Clear All
+            </Button>
+          </div>
+        )}
+
+      {/* Relationship Type Recovery Banner */}
+      {potentialMiscategorized.length > 0 && !bannerDismissed && (
+          <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+            <AlertCircle className="h-5 w-5 text-blue-600" />
+            <AlertTitle>Contact Review Needed</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>
+                Found {potentialMiscategorized.length} contacts labeled as "Lead - Amplifier". 
+                If any were previously "Past Client", you can re-categorize them below.
+              </p>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setRelationshipFilter('lead_amplifier');
+                    setSelectedContacts([]);
+                  }}
+                  className="border-blue-300 hover:bg-blue-100"
+                >
+                  Show These Contacts
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setRelationshipFilter('lead_amplifier');
+                    handleSelectAll();
+                  }}
+                  className="border-blue-300 hover:bg-blue-100"
+                >
+              Select All & Change Type
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem('leadAmplifierBannerDismissed', 'true');
+                setBannerDismissed(true);
+                toast({
+                  title: "Banner Dismissed",
+                  description: "You can clear your browser data to re-enable this banner.",
+                });
+              }}
+              className="text-blue-600 hover:text-blue-700"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Don't show again
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    )}
+        
         {/* Header with search and filters */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -447,42 +703,36 @@ export function ContactList({
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Relationship</div>
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setRelationshipFilter('lead');
-                      setStatusFilter('all');
-                    }}
-                    className={relationshipFilter === 'lead' ? 'bg-accent' : ''}
-                  >
-                    Lead
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setRelationshipFilter('past_client');
-                      setStatusFilter('all');
-                    }}
-                    className={relationshipFilter === 'past_client' ? 'bg-accent' : ''}
-                  >
-                    Past Client
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setRelationshipFilter('booked_client');
-                      setStatusFilter('all');
-                    }}
-                    className={relationshipFilter === 'booked_client' ? 'bg-accent' : ''}
-                  >
-                    Booked Client
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setRelationshipFilter('referral_source');
-                      setStatusFilter('all');
-                    }}
-                    className={relationshipFilter === 'referral_source' ? 'bg-accent' : ''}
-                  >
-                    Referral Source
-                  </DropdownMenuItem>
+                  {relationshipTypes.map((type) => (
+                    <DropdownMenuItem 
+                      key={type.name}
+                      onClick={() => {
+                        setRelationshipFilter(type.name);
+                        setStatusFilter('all');
+                      }}
+                      className={relationshipFilter === type.name ? 'bg-accent' : ''}
+                    >
+                      {type.label}
+                    </DropdownMenuItem>
+                  ))}
+                  {potentialMiscategorized.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        🔍 Review Needed
+                      </div>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          setRelationshipFilter('lead_amplifier');
+                          setStatusFilter('all');
+                          setCategoryFilter('all');
+                        }}
+                      >
+                        <AlertCircle className="mr-2 h-4 w-4 text-blue-500" />
+                        Lead Amplifier Contacts ({potentialMiscategorized.length})
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -502,6 +752,17 @@ export function ContactList({
               >
                 <Target className="w-4 h-4 mr-2" />
                 Ready
+              </Button>
+
+              {/* Instagram Contacts Filter */}
+              <Button 
+                variant={showInstagramOnly ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowInstagramOnly(!showInstagramOnly)}
+                className={showInstagramOnly ? 'bg-primary text-primary-foreground' : 'border-purple-200 hover:bg-purple-50 text-purple-700'}
+              >
+                <Instagram className="w-4 h-4 mr-2" />
+                Instagram ({contacts.filter(c => c.socialMediaLinks?.instagram && !c.email).length})
               </Button>
             </div>
             
@@ -557,15 +818,15 @@ export function ContactList({
             <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">
-                    {selectedContacts.length} contact(s) selected
-                  </span>
+                  <Badge variant="default" className="text-base px-3 py-1.5">
+                    {selectedContacts.length} Selected
+                  </Badge>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     onClick={() => setSelectedContacts([])}
                   >
-                    Clear Selection
+                    Clear
                   </Button>
                 </div>
                 <div className="flex gap-2 flex-wrap">
@@ -601,6 +862,21 @@ export function ContactList({
                   >
                     Delete Activities
                   </Button>
+                  {selectedContacts.some(id => {
+                    const contact = contacts.find(c => c.id === id);
+                    return contact?.socialMediaLinks?.instagram && !contact.email;
+                  }) && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={handleBulkEnrich}
+                      disabled={!canWrite || isEnriching || disabled}
+                      className="gap-2 bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Zap className="w-4 h-4" />
+                      {isEnriching ? 'Enriching...' : 'Enrich Selected'}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="destructive"
@@ -656,9 +932,54 @@ export function ContactList({
                 />
                 Show Archived
               </label>
-              <p className="text-sm text-muted-foreground">
-                {filteredContacts.length} of {contacts.length} contacts
-              </p>
+              <Button
+                variant={showInstagramOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowInstagramOnly(!showInstagramOnly)}
+                className="gap-2"
+              >
+                <Instagram className="w-4 h-4" />
+                Instagram ({contacts.filter(c => c.socialMediaLinks?.instagram && !c.email).length})
+              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm text-muted-foreground">
+                  {filteredContacts.length} of {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+                </p>
+                {hasActiveFilters && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {searchTerm && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/40">
+                        Search: "{searchTerm}"
+                      </Badge>
+                    )}
+                    {statusFilter !== 'all' && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/40">
+                        Status: {statusFilter}
+                      </Badge>
+                    )}
+                    {relationshipFilter !== 'all' && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/40">
+                        Relationship: {relationshipFilter}
+                      </Badge>
+                    )}
+                    {categoryFilter !== 'all' && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/40">
+                        Category: {categoryFilter}
+                      </Badge>
+                    )}
+                    {showArchived && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/40">
+                        Archived Only
+                      </Badge>
+                    )}
+                    {showInstagramOnly && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/40">
+                        Instagram Only
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -674,10 +995,14 @@ export function ContactList({
               return (
                 <Card 
                   key={contact.id} 
-                  className={`relative transition-all duration-200 hover:shadow-lg cursor-pointer ${
-                    isSelected ? 'ring-2 ring-primary' : ''
-                  } ${isHighlighted ? 'opacity-30' : ''}`}
-                  onClick={() => onContactSelect(contact)}
+                  className={cn(
+                    "relative transition-all duration-200 hover:shadow-lg cursor-pointer",
+                    isSelected && "ring-2 ring-primary bg-primary/5",
+                    isHighlighted && "opacity-30"
+                  )}
+                  onClick={(e) => {
+                    onContactSelect(contact);
+                  }}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -689,6 +1014,42 @@ export function ContactList({
                                 {contact.name}
                               </CardTitle>
                               <DemoContactIndicator contact={contact} />
+                              {contact.socialMediaLinks?.instagram && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <a
+                                      href={`https://www.instagram.com/${contact.socialMediaLinks.instagram.replace('@', '')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-purple-500 hover:text-purple-600"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Instagram className="w-4 h-4" />
+                                    </a>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    @{contact.socialMediaLinks.instagram}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {contact.linkedinUrl && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <a
+                                      href={contact.linkedinUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-700"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Linkedin className="w-4 h-4" />
+                                    </a>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    View LinkedIn Profile
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground truncate">{contact.email}</p>
                             {contact.company && (
@@ -718,7 +1079,25 @@ export function ContactList({
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex gap-2 flex-wrap">
                         <StatusBadge status={contact.status} />
-                        <RelationshipBadge type={contact.relationshipType} />
+                        <EnhancedRelationshipBadge
+                          relationshipType={contact.relationshipType}
+                          disabled
+                          className="text-xs"
+                        />
+                        {contact.relationshipStatus && (
+                          <EnhancedRelationshipStatusBadge
+                            relationshipType={contact.relationshipType}
+                            relationshipStatus={contact.relationshipStatus}
+                            disabled
+                            className="text-xs"
+                          />
+                        )}
+                        <ContactContextTags
+                          contactId={contact.id}
+                          preloadedContexts={contact.contexts}
+                          maxDisplay={2}
+                          disabled
+                        />
                         <ContactCategoryBadge category={contact.category} />
                       </div>
                     </div>
@@ -731,14 +1110,7 @@ export function ContactList({
                          </Badge>
                       </div>
 
-                      {contact.revenueAmount && contact.revenueAmount > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Revenue:</span>
-                          <span className="font-medium text-green-600">
-                            ${contact.revenueAmount.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
+                      <ContactRevenueDisplay contactId={contact.id} />
 
                       <div className="flex flex-wrap gap-1 pt-2">
                         <Tooltip>
@@ -851,6 +1223,15 @@ export function ContactList({
                             }}>
                               <Linkedin className="w-4 h-4 mr-2" />
                               LinkedIn
+                            </DropdownMenuItem>
+                          )}
+                          {contact.socialMediaLinks?.instagram && (
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(`https://www.instagram.com/${contact.socialMediaLinks.instagram.replace('@', '')}`, '_blank');
+                            }}>
+                              <Instagram className="w-4 h-4 mr-2" />
+                              Instagram
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -984,28 +1365,35 @@ export function ContactList({
                         <StatusBadge status={contact.status} />
                       </TableCell>
                       <TableCell>
-                        <RelationshipBadge type={contact.relationshipType} />
+                        <EnhancedRelationshipBadge
+                          relationshipType={contact.relationshipType}
+                          disabled
+                          className="text-xs"
+                        />
                       </TableCell>
                       <TableCell>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.dispatchEvent(new CustomEvent('openRevenueDialogInternal', {
-                                  detail: { contactName: contact.name, contactId: contact.id, contactStatus: contact.status }
-                                }));
-                              }}
-                              disabled={!canWrite}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                            >
-                              <DollarSign className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Log revenue</TooltipContent>
-                        </Tooltip>
+                        <div className="flex items-center gap-2">
+                          <ContactRevenueDisplay contactId={contact.id} />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.dispatchEvent(new CustomEvent('openRevenueDialogInternal', {
+                                    detail: { contactName: contact.name, contactId: contact.id, contactStatus: contact.status }
+                                  }));
+                                }}
+                                disabled={!canWrite}
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              >
+                                <DollarSign className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Log revenue</TooltipContent>
+                          </Tooltip>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <ContactCategoryBadge category={contact.category} />
@@ -1092,6 +1480,15 @@ export function ContactList({
                                 }}>
                                   <Linkedin className="w-4 h-4 mr-2" />
                                   LinkedIn
+                                </DropdownMenuItem>
+                              )}
+                              {contact.socialMediaLinks?.instagram && (
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(`https://www.instagram.com/${contact.socialMediaLinks.instagram.replace('@', '')}`, '_blank');
+                                }}>
+                                  <Instagram className="w-4 h-4 mr-2" />
+                                  Instagram
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
@@ -1233,15 +1630,41 @@ export function ContactList({
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {bulkActionType === 'change-category' && (
-                  <div className="space-y-3">
-                    <p>Change category for {selectedContacts.length} selected contact(s)?</p>
+                  <div className="space-y-4">
+                    <p className="font-medium">
+                      Change category for {selectedContacts.length} selected contact(s)?
+                    </p>
+                    
+                    {/* Preview section */}
+                    <div className="rounded-md border p-3 bg-muted/30">
+                      <p className="text-xs font-semibold mb-2 text-muted-foreground">
+                        Preview (showing first 5):
+                      </p>
+                      <div className="space-y-1">
+                        {filteredContacts
+                          .filter(c => selectedContacts.includes(c.id))
+                          .slice(0, 5)
+                          .map(contact => (
+                            <div key={contact.id} className="text-sm flex items-center gap-2">
+                              <span className="flex-1 truncate">{contact.name}</span>
+                              <ContactCategoryBadge category={contact.category} />
+                            </div>
+                          ))}
+                        {selectedContacts.length > 5 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ...and {selectedContacts.length - 5} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium mb-2">New Category:</label>
                       <Select value={newCategory} onValueChange={setNewCategory}>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select category..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
+                        <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px] overflow-y-auto">
                           {categories.map(category => (
                             <SelectItem key={category.id} value={category.name}>
                               {category.label}
@@ -1250,40 +1673,156 @@ export function ContactList({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Impact summary */}
+                    {newCategory && (
+                      <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-3">
+                        <p className="text-sm text-amber-900 dark:text-amber-100">
+                          <strong>{selectedContacts.length}</strong> contact{selectedContacts.length > 1 ? 's' : ''} will be changed to{' '}
+                          <strong>{categories.find(c => c.name === newCategory)?.label || newCategory}</strong>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {bulkActionType === 'change-relationship' && (
-                  <div className="space-y-3">
-                    <p>Change relationship type for {selectedContacts.length} selected contact(s)?</p>
+                  <div className="space-y-4">
+                    <p className="font-medium">
+                      Change relationship type for {selectedContacts.length} selected contact(s)?
+                    </p>
+                    
+                    {/* Preview of affected contacts */}
+                    <div className="rounded-md border p-3 bg-muted/30">
+                      <p className="text-xs font-semibold mb-2 text-muted-foreground">
+                        Preview (showing first 5):
+                      </p>
+                      <div className="space-y-1">
+                        {filteredContacts
+                          .filter(c => selectedContacts.includes(c.id))
+                          .slice(0, 5)
+                          .map(contact => (
+                            <div key={contact.id} className="text-sm flex items-center gap-2">
+                              <span className="flex-1 truncate">{contact.name}</span>
+                              <EnhancedRelationshipBadge 
+                                relationshipType={contact.relationshipType} 
+                                className="text-xs"
+                              />
+                            </div>
+                          ))}
+                        {selectedContacts.length > 5 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ...and {selectedContacts.length - 5} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Relationship type selector with smart suggestion */}
                     <div>
-                      <label className="block text-sm font-medium mb-2">New Relationship Type:</label>
-                      <Select value={newRelationshipType} onValueChange={(value: RelationshipType) => setNewRelationshipType(value)}>
+                      <label className="block text-sm font-medium mb-2">
+                        New Relationship Type:
+                      </label>
+                      <Select 
+                        value={newRelationshipType} 
+                        onValueChange={(value: RelationshipType) => setNewRelationshipType(value)}
+                      >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select relationship type..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
-                          <SelectItem value="lead">Lead</SelectItem>
-                          <SelectItem value="lead_amplifier">Lead Amplifier</SelectItem>
-                          <SelectItem value="past_client">Past Client</SelectItem>
-                          <SelectItem value="friend_family">Friend/Family</SelectItem>
-                          <SelectItem value="associate_partner">Associate/Partner</SelectItem>
-                          <SelectItem value="referral_source">Referral Source</SelectItem>
-                          <SelectItem value="booked_client">Booked Client</SelectItem>
+                        <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px] overflow-y-auto">
+                          {/* Smart suggestion for lead_amplifier → past_client */}
+                          {relationshipFilter === 'lead_amplifier' && 
+                           relationshipTypes.some(t => t.name === 'past_client') && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                                💡 Suggested
+                              </div>
+                              {relationshipTypes
+                                .filter(t => t.name === 'past_client')
+                                .map(type => (
+                                  <SelectItem 
+                                    key={type.name} 
+                                    value={type.name}
+                                    className="bg-blue-50 dark:bg-blue-900/20"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span>{type.label}</span>
+                                      <Badge variant="outline" className="text-xs">
+                                        Recommended
+                                      </Badge>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              <div className="h-px bg-border my-1" />
+                            </>
+                          )}
+                          
+                          {/* All other relationship types */}
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                            All Types
+                          </div>
+                          {relationshipTypes
+                            .filter(t => t.name !== 'past_client' || relationshipFilter !== 'lead_amplifier')
+                            .map(type => (
+                              <SelectItem key={type.name} value={type.name}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Impact summary */}
+                    {newRelationshipType && (
+                      <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-3">
+                        <p className="text-sm text-amber-900 dark:text-amber-100">
+                          <strong>{selectedContacts.length}</strong> contacts will be changed from{' '}
+                          <strong className="font-mono text-xs">
+                            {filteredContacts.find(c => selectedContacts.includes(c.id))?.relationshipType || 'current'}
+                          </strong>
+                          {' '}to{' '}
+                          <strong className="font-mono text-xs">{newRelationshipType}</strong>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {bulkActionType === 'change-status' && (
-                  <div className="space-y-3">
-                    <p>Change status for {selectedContacts.length} selected contact(s)?</p>
+                  <div className="space-y-4">
+                    <p className="font-medium">
+                      Change status for {selectedContacts.length} selected contact(s)?
+                    </p>
+                    
+                    {/* Preview section */}
+                    <div className="rounded-md border p-3 bg-muted/30">
+                      <p className="text-xs font-semibold mb-2 text-muted-foreground">
+                        Preview (showing first 5):
+                      </p>
+                      <div className="space-y-1">
+                        {filteredContacts
+                          .filter(c => selectedContacts.includes(c.id))
+                          .slice(0, 5)
+                          .map(contact => (
+                            <div key={contact.id} className="text-sm flex items-center gap-2">
+                              <span className="flex-1 truncate">{contact.name}</span>
+                              <StatusBadge status={contact.status} />
+                            </div>
+                          ))}
+                        {selectedContacts.length > 5 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ...and {selectedContacts.length - 5} more
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium mb-2">New Status:</label>
                       <Select value={newStatus} onValueChange={(value: LeadStatus) => setNewStatus(value)}>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select status..." />
                         </SelectTrigger>
-                        <SelectContent className="bg-background border shadow-lg z-50">
+                        <SelectContent className="bg-background border shadow-lg z-50 max-h-[300px] overflow-y-auto">
                           <SelectItem value="none">None</SelectItem>
                           <SelectItem value="cold">Cold</SelectItem>
                           <SelectItem value="warm">Warm</SelectItem>
@@ -1294,6 +1833,16 @@ export function ContactList({
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Impact summary */}
+                    {newStatus && (
+                      <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-3">
+                        <p className="text-sm text-amber-900 dark:text-amber-100">
+                          <strong>{selectedContacts.length}</strong> contact{selectedContacts.length > 1 ? 's' : ''} will be changed to{' '}
+                          <strong className="capitalize">{newStatus.replace(/_/g, ' ')}</strong>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {bulkActionType === 'delete-contacts' && 
@@ -1315,6 +1864,11 @@ export function ContactList({
               </AlertDialogCancel>
               <AlertDialogAction 
                 onClick={confirmBulkAction}
+                disabled={
+                  (bulkActionType === 'change-category' && !newCategory) ||
+                  (bulkActionType === 'change-relationship' && !newRelationshipType) ||
+                  (bulkActionType === 'change-status' && !newStatus)
+                }
                 className={bulkActionType === 'delete-contacts' || bulkActionType === 'delete-activities' ? 
                   'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
               >

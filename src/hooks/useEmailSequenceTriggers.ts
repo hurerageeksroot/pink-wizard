@@ -92,39 +92,8 @@ export function useEmailSequenceTriggers() {
     }
   };
 
-  // Function to trigger trial ending sequence
-  const triggerTrialEnding = async (userId: string, daysLeft: number) => {
-    try {
-      console.log('Triggering trial ending sequence for user:', userId);
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', userId)
-        .single();
-        
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user?.email) {
-        await supabase.rpc('trigger_email_sequence', {
-          p_trigger_event: 'trial_ending',
-          p_user_id: userId,
-          p_user_email: user.email,
-          p_variables: {
-            user_name: profile?.display_name || 'there',
-            days_left: daysLeft.toString(),
-            trial_end_date: new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000).toLocaleDateString()
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error triggering trial ending sequence:', error);
-    }
-  };
-
   return {
     triggerChallengeStart,
-    triggerChallengeComplete,
-    triggerTrialEnding
+    triggerChallengeComplete
   };
 }

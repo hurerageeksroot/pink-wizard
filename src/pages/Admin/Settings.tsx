@@ -41,6 +41,10 @@ import { ChallengeEmailBroadcast } from '@/components/Admin/ChallengeEmailBroadc
 import { ChallengePrizeManager } from '@/components/Admin/ChallengePrizeManager';
 import { BusinessGoalsImport } from '@/components/Admin/BusinessGoalsImport';
 import { AIInstructionsManager } from '@/components/Admin/AIInstructionEditor';
+import { RelationshipTypeManager } from '@/components/Admin/RelationshipTypeManager';
+import { ContactContextManager } from '@/components/Admin/ContactContextManager';
+import { RelationshipStatusManager } from '@/components/Admin/RelationshipStatusManager';
+import { AdminErrorBoundary } from '@/components/Admin/AdminErrorBoundary';
 
 export function Settings() {
   const { loading } = useAdminData();
@@ -129,10 +133,14 @@ export function Settings() {
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <SettingsIcon className="h-4 w-4" />
             General
+          </TabsTrigger>
+          <TabsTrigger value="relationships" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Relationships
           </TabsTrigger>
           <TabsTrigger value="email" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
@@ -249,6 +257,39 @@ export function Settings() {
                 <Save className="mr-2 h-4 w-4" />
                 Save General Settings
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="relationships">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Relationship & Contact Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <AdminErrorBoundary>
+                <RelationshipTypeManager />
+              </AdminErrorBoundary>
+              {/* Contact Context Tags - Also available in user settings */}
+              <div className="border-t pt-6">
+                <div className="mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    Manage contact context tags (also accessible to users in Settings → Tags)
+                  </p>
+                </div>
+                <AdminErrorBoundary>
+                  <ContactContextManager />
+                </AdminErrorBoundary>
+              </div>
+              {/* Add RelationshipStatusManager here */}
+              <div className="border-t pt-6">
+                <AdminErrorBoundary>
+                  <RelationshipStatusManager />
+                </AdminErrorBoundary>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

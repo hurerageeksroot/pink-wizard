@@ -8,51 +8,90 @@ export function computeNextFollowUp(
   fromDate: Date = new Date()
 ): Date | null {
   if (!settings.auto_followup_enabled) {
+    console.log('⏸️ [computeNextFollowUp] Auto-followup disabled in settings');
     return null;
   }
 
   let cadenceRule: CadenceRule | null = null;
 
-  // Priority order: Relationship rules first, then status rules, then fallback
-  // 1. Check relationship-based cadences first (this is the primary logic)
-  if (contact.relationshipType && settings.cadences.relationship[contact.relationshipType]) {
-    const relationshipRule = settings.cadences.relationship[contact.relationshipType];
-    if (relationshipRule.enabled) {
-      cadenceRule = relationshipRule;
+  // Look up cadence based on relationship intent and status
+  if (contact.relationshipIntent && contact.relationshipStatus) {
+    const intentGroup = settings.cadences[contact.relationshipIntent as keyof typeof settings.cadences];
+    
+    console.log('🔍 [computeNextFollowUp] Looking up cadence:', {
+      contactName: contact.name,
+      intent: contact.relationshipIntent,
+      status: contact.relationshipStatus,
+      intentGroupExists: !!intentGroup,
+      intentGroupType: typeof intentGroup
+    });
+    
+    // intentGroup should be an object with status rules (not the fallback rule)
+    if (intentGroup && typeof intentGroup === 'object' && 'enabled' in intentGroup === false) {
+      const statusRule = (intentGroup as any)[contact.relationshipStatus];
+      
+      console.log('🔍 [computeNextFollowUp] Status rule lookup:', {
+        statusRule: statusRule ? { enabled: statusRule.enabled, value: statusRule.value, unit: statusRule.unit } : null,
+        availableStatuses: Object.keys(intentGroup)
+      });
+      
+      if (statusRule?.enabled) {
+        cadenceRule = statusRule;
+        console.log('✅ [computeNextFollowUp] Found valid cadence rule:', cadenceRule);
+      } else if (statusRule) {
+        console.warn('⚠️ [computeNextFollowUp] Status rule exists but is disabled');
+      } else {
+        console.warn('⚠️ [computeNextFollowUp] No status rule found - invalid status for this intent!', {
+          intent: contact.relationshipIntent,
+          status: contact.relationshipStatus,
+          validStatuses: Object.keys(intentGroup)
+        });
+      }
     }
+  } else {
+    console.warn('⚠️ [computeNextFollowUp] Missing intent or status:', {
+      hasIntent: !!contact.relationshipIntent,
+      hasStatus: !!contact.relationshipStatus
+    });
   }
 
-  // 2. If no enabled relationship rule, check status-based cadences
-  if (!cadenceRule && contact.status && settings.cadences.status[contact.status]) {
-    const statusRule = settings.cadences.status[contact.status];
-    if (statusRule.enabled) {
-      cadenceRule = statusRule;
-    }
-  }
-
-  // 3. If still no rule, use fallback
+  // If no enabled rule found, use fallback
   if (!cadenceRule) {
     cadenceRule = settings.cadences.fallback;
+    console.log('📌 [computeNextFollowUp] Using fallback cadence:', cadenceRule);
   }
 
   // If fallback is also disabled, return null
-  // Note: Allow value of 0 for "Today" cadences
   if (!cadenceRule?.enabled || cadenceRule.value === undefined || cadenceRule.value === null || !cadenceRule.unit) {
+    console.log('⏸️ [computeNextFollowUp] No valid cadence rule (fallback also disabled or invalid)');
     return null;
   }
 
   // Calculate the next follow-up date
+  let nextDate: Date | null = null;
   switch (cadenceRule.unit) {
     case 'days':
-      // If value is 0, return today (same date)
-      return cadenceRule.value === 0 ? fromDate : addDays(fromDate, cadenceRule.value);
+      nextDate = cadenceRule.value === 0 ? fromDate : addDays(fromDate, cadenceRule.value);
+      break;
     case 'weeks':
-      return addWeeks(fromDate, cadenceRule.value);
+      nextDate = addWeeks(fromDate, cadenceRule.value);
+      break;
     case 'months':
-      return addMonths(fromDate, cadenceRule.value);
+      nextDate = addMonths(fromDate, cadenceRule.value);
+      break;
     default:
+      console.warn('⚠️ [computeNextFollowUp] Invalid cadence unit:', cadenceRule.unit);
       return null;
   }
+
+  console.log('📅 [computeNextFollowUp] Computed follow-up date:', {
+    contactName: contact.name,
+    fromDate: fromDate.toISOString(),
+    nextDate: nextDate?.toISOString(),
+    rule: { value: cadenceRule.value, unit: cadenceRule.unit }
+  });
+
+  return nextDate;
 }
 
 export function formatCadenceRule(rule: CadenceRule): string {

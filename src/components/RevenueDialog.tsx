@@ -19,22 +19,22 @@ export function RevenueDialog() {
   const [referredClient, setReferredClient] = useState<string>('');
   const [isLogging, setIsLogging] = useState(false);
 
-  // Debug logging for dialog state and load current revenue
+  // Load current revenue when editing, reset when closing
   useEffect(() => {
-    console.log('=== RevenueDialog isOpen changed ===', isOpen);
-    console.log('=== RevenueDialog contactName ===', contactName);
-    console.log('=== RevenueDialog contactId ===', contactId);
-    console.log('=== RevenueDialog contactStatus ===', contactStatus);
-    
-    if (isOpen && contactId) {
-      // Set default revenue type to direct revenue
+    if (isOpen && currentRevenue) {
+      // Editing mode - populate all fields from currentRevenue object
+      setRevenue(currentRevenue.amount?.toString() || '');
+      setNotes(currentRevenue.notes || '');
+      setRevenueType(currentRevenue.revenueType || 'direct');
+      setReferredClient(currentRevenue.referredClient || '');
+    } else if (!isOpen) {
+      // Reset form when dialog closes
+      setRevenue('');
+      setNotes('');
       setRevenueType('direct');
-      
-      if (currentRevenue !== undefined) {
-        setRevenue(currentRevenue.toString());
-      }
+      setReferredClient('');
     }
-  }, [isOpen, contactName, contactId, contactStatus, currentRevenue]);
+  }, [isOpen, currentRevenue]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

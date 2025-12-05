@@ -1,11 +1,27 @@
-export type LeadStatus = 'none' | 'cold' | 'warm' | 'hot' | 'won' | 'lost_maybe_later' | 'lost_not_fit';
+// Enhanced Relationship System Types
+export type RelationshipIntent = 
+  | 'business_lead_statuses'
+  | 'business_nurture_statuses'
+  | 'personal_statuses'
+  | 'civic_statuses'
+  | 'vendor_statuses'
+  | 'other_misc';
 
-export type RelationshipType = 'lead' | 'lead_amplifier' | 'past_client' | 'friend_family' | 'associate_partner' | 'referral_source' | 'booked_client';
+export type RelationshipType = string;
 
-// ContactCategory is now dynamic - stored as string and managed via useContactCategories hook
+// Dynamic relationship status based on relationship intent
+export type RelationshipStatus = string;
+
+// ContactCategory is now dynamic - stored as string and managed via useContactCategories hook  
 export type ContactCategory = string;
 
-export type TouchpointType = 'email' | 'linkedin' | 'social' | 'call' | 'meeting' | 'mail' | 'text';
+// Contact Context for multi-tag system
+export type ContactContext = string;
+
+// Legacy support - will be migrated to RelationshipStatus
+export type LeadStatus = 'none' | 'cold' | 'warm' | 'hot' | 'won' | 'lost_maybe_later' | 'lost_not_fit';
+
+export type TouchpointType = 'email' | 'linkedin' | 'social' | 'call' | 'meeting' | 'mail' | 'text' | 'introduction';
 
 export type ActivityType = TouchpointType | 'revenue' | 'status_change';
 
@@ -29,9 +45,12 @@ export interface Contact {
     facebook?: string;
     tiktok?: string;
   };
-  status: LeadStatus;
+  status: LeadStatus; // Legacy field - will be migrated
+  relationshipStatus?: RelationshipStatus; // New dynamic status field
   relationshipType: RelationshipType;
-  category: ContactCategory;
+  relationshipIntent?: RelationshipIntent; // Intent category for cadence lookup
+  category: ContactCategory; // Legacy single category - will be migrated
+  contexts?: ContactContextData[]; // New multi-tag system - preloaded context data
   source: string;
   createdAt: Date;
   lastContactDate?: Date;
@@ -51,6 +70,7 @@ export interface Activity {
   type: ActivityType;
   title: string;
   description?: string;
+  messageContent?: string; // Actual content sent/discussed (email body, text, call notes, etc.)
   responseReceived: boolean;
   scheduledFor?: Date;
   completedAt?: Date;
@@ -68,6 +88,22 @@ export interface CRMStats {
   avgTouchpointsPerLead: number;
   familiarContacts: number;
   leadsCount: number;
+  
+  // Daily metrics
+  todayNewContacts: number;
+  todayFollowUpsCompleted: number;
+  
+  // Weekly metrics
+  thisWeekNewContacts: number;
+  thisWeekFollowUpsCompleted: number;
+  thisWeekFollowUpsMissed: number;
+  thisWeekActivities: number;
+  
+  // Monthly metrics
+  thisMonthNewContacts: number;
+  thisMonthFollowUpsCompleted: number;
+  thisMonthFollowUpsMissed: number;
+  thisMonthActivities: number;
 }
 
 export interface BusinessProfile {
@@ -97,4 +133,65 @@ export interface OutreachRequest {
   contactName?: string;
   offerIncentive?: string;
   callToAction?: string;
+  contactSpecificGoal?: string;
+  coreDesire?: 'breakthrough' | 'relationships' | 'informed_decisions' | 'achieve_goals' | 'not_sure';
+  coreFear?: 'plateauing' | 'missing_connections' | 'wrong_choice' | 'wasting_time' | 'not_sure';
+}
+
+// Enhanced Relationship System Interfaces
+export interface ContactContextData {
+  id: string;
+  name: string;
+  label: string;
+  iconName: string;
+  colorClass: string;
+  isDefault: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ContactContextCreate {
+  name: string;
+  label: string;
+  iconName?: string;
+  colorClass?: string;
+}
+
+export interface EnhancedRelationshipTypeData {
+  id: string;
+  name: string;
+  label: string;
+  iconName: string;
+  colorClass: string;
+  relationshipIntent: RelationshipIntent;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+export interface EnhancedRelationshipTypeCreate {
+  name: string;
+  label: string;
+  iconName?: string;
+  colorClass?: string;
+  relationshipIntent: RelationshipIntent;
+}
+
+// Status configurations for different relationship intents
+export interface RelationshipStatusConfig {
+  [key: string]: {
+    label: string;
+    description: string;
+    colorClass: string;
+    isTerminal?: boolean; // true for statuses like 'won' or 'lost'
+  };
+}
+
+export interface RelationshipIntentConfig {
+  label: string;
+  description: string;
+  iconName: string;
+  colorClass: string;
+  statusOptions: RelationshipStatusConfig;
+  defaultStatus: string;
 }

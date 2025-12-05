@@ -200,10 +200,65 @@ Core Value Propositions:
       title: 'Relationship Strategy Matrix',
       description: 'How to approach different types of relationships',
       content: `RELATIONSHIP STRATEGY MATRIX:
-- Current Clients (booked_client, won status): Focus on service expansion, testimonials, referrals. Tone: appreciative, relationship-building.
-- Past Clients: Reconnection, new opportunities, staying top-of-mind. Tone: warm, nostalgic.
-- Warm Leads: Continue conversation, advance relationship. Tone: professional but friendly.
-- Cold Prospects: Value-first approach, problem-solution fit. Tone: professional, helpful.`,
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CURRENT/ACTIVE CLIENTS (booked_client, won status)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Focus on: Service expansion, testimonials, referrals
+- Tone: Appreciative, relationship-building
+- Opening strategy: Thank them, reference recent work, add value
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PAST CLIENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Focus on: Reconnection, new opportunities, staying top-of-mind
+- Tone: Warm, nostalgic
+- Opening strategy: Reference past event/project, share updates, offer new value
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARM CONTACTS - CRITICAL NUANCE REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPORTANT: "Warm" has TWO distinct types - detect which applies:
+
+**TYPE 1: CONVERSATION-BASED WARM**
+When: TOUCHPOINT HISTORY section shows recent calls, meetings, or direct conversations
+Opening strategies:
+- "Following up on our conversation about..."
+- "Building on what we discussed..."
+- "I've been thinking about [specific thing they mentioned]..."
+- Reference specific details from previous interactions
+
+**TYPE 2: ECOSYSTEM-BASED WARM (PASSIVE)**
+When: NO recent touchpoint history OR touchpoints are passive (email opens, social engagement, past purchases, referrals)
+Opening strategies:
+- "I noticed [recent behavior/purchase/engagement]..."
+- "As someone who [has worked with us/follows our content/is in our network]..."
+- "Given your interest in [topic/service]..."
+- "You've been on my mind because [relevant business context]..."
+- "I saw [their recent post/achievement/announcement]..."
+- Reference their position/expertise, NOT a conversation that didn't happen
+
+❌ NEVER for Ecosystem-Based Warm:
+- "I've been thinking about our conversation..." (there was no conversation!)
+- "Following up on what we discussed..." (we didn't discuss anything!)
+- "As we talked about..." (we didn't talk!)
+- Any reference to interactions that don't exist in the touchpoint history
+
+✅ DO for Ecosystem-Based Warm:
+- Acknowledge the existing relationship naturally ("You've been part of our community...")
+- Reference observable behaviors ("I saw you booked with us last year...")
+- Use shared context ("As a fellow [industry] professional...")
+- Lead with value and relevance, not fabricated conversations
+- If they purchased before, reference the value they experienced
+- If they follow your content, reference shared interests/topics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COLD PROSPECTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Focus on: Value-first approach, problem-solution fit
+- Tone: Professional, helpful
+- Opening strategy: Establish credibility, identify with their pain point, offer value`,
       isActive: true,
       version: 1,
       lastUpdated: new Date().toISOString(),

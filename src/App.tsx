@@ -11,12 +11,13 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import EnhancedErrorBoundary from "@/components/EnhancedErrorBoundary";
 import { GlobalDataProvider } from "@/components/GlobalDataProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Navbar } from "@/components/Navbar";
+import { Navbar, NavbarWrapper } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { AppHealthMonitor } from "@/components/AppHealthMonitor";
+import { VersionIndicator } from "@/components/VersionIndicator";
 
 // Lazy load all pages for better performance
 // Direct import for Index to avoid lazy loading issues
@@ -25,6 +26,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AIOutreach = lazy(() => import("./pages/AIOutreach"));
+const Campaigns = lazy(() => import("./pages/Campaigns"));
 const Help = lazy(() => import("./pages/Help"));
 // Direct import for AdminRoutes to avoid lazy loading issues
 import AdminRoutes from "./pages/AdminRoutes";
@@ -38,15 +40,16 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const Features = lazy(() => import("./pages/Features"));
+const Prospecting = lazy(() => import("./pages/Prospecting"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes - much longer cache
-      gcTime: 15 * 60 * 1000, // 15 minutes garbage collection  
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
+      staleTime: 60 * 1000, // 60 seconds - increased to reduce refetch frequency
+      gcTime: 30 * 60 * 1000, // 30 minutes garbage collection - increased for better caching
+      refetchOnWindowFocus: false, // Prevent excessive auth checks
+      refetchOnMount: false, // Prevent excessive auth checks
+      refetchOnReconnect: false, // Keep disabled to avoid excessive requests
       retry: 1, // Reduce retries for failed requests
       refetchInterval: false, // Disable automatic background refetch
     },
@@ -61,15 +64,15 @@ const AppContent: FC = () => {
       <div className="min-h-screen flex w-full">
         {user && <AppSidebar />}
         <div className="flex-1 flex flex-col min-w-0">
-          {user && (
-            <div className="md:hidden sticky top-0 z-40 bg-background border-b px-4 py-2 flex items-center justify-between">
-              <SidebarTrigger className="p-2" />
-              <h1 className="text-lg font-semibold">CRM Dashboard</h1>
-            </div>
-          )}
-          <Navbar />
+          <NavbarWrapper />
           <main className="flex-1 route-transition">
-            <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center min-h-screen">
+                  Loading...
+                </div>
+              }
+            >
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
@@ -80,42 +83,79 @@ const AppContent: FC = () => {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/ai-outreach" element={
-                  <ProtectedRoute>
-                    <AIOutreach />
-                  </ProtectedRoute>
-                } />
-                <Route path="/leaderboard" element={
-                  <ProtectedRoute>
-                    <Leaderboard />
-                  </ProtectedRoute>
-                } />
+                <Route
+                  path="/ai-outreach"
+                  element={
+                    <ProtectedRoute>
+                      <AIOutreach />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/campaigns"
+                  element={
+                    <ProtectedRoute>
+                      <Campaigns />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/prospecting"
+                  element={
+                    <ProtectedRoute>
+                      <Prospecting />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/leaderboard"
+                  element={
+                    <ProtectedRoute>
+                      <Leaderboard />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/help" element={<Help />} />
-                <Route path="/admin/*" element={
-                  <ProtectedRoute>
-                    <AdminRoutes />
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin" element={
-                  <ProtectedRoute>
-                    <AdminRoutes />
-                  </ProtectedRoute>
-                } />
-                <Route path="/settings" element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
-                <Route path="/resources" element={
-                  <ProtectedRoute>
-                    <Resources />
-                  </ProtectedRoute>
-                } />
-                <Route path="/resources/:id" element={
-                  <ProtectedRoute>
-                    <ResourceArticle />
-                  </ProtectedRoute>
-                } />
+                <Route
+                  path="/admin/*"
+                  element={
+                    <ProtectedRoute>
+                      <AdminRoutes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute>
+                      <AdminRoutes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/resources"
+                  element={
+                    <ProtectedRoute>
+                      <Resources />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/resources/:id"
+                  element={
+                    <ProtectedRoute>
+                      <ResourceArticle />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
@@ -123,6 +163,7 @@ const AppContent: FC = () => {
           <Footer />
         </div>
       </div>
+      <VersionIndicator />
       <Toaster />
     </SidebarProvider>
   );
@@ -135,14 +176,14 @@ const App: FC = () => {
         <BrowserRouter>
           <ScrollToTop />
           <AppHealthMonitor />
-        <AuthProvider>
-          <GlobalDataProvider>
-            <SessionBridge />
-            <ExternalCountsBridge />
-            <EmailNotificationHandler />
-            <AppContent />
-          </GlobalDataProvider>
-        </AuthProvider>
+          <AuthProvider>
+            <GlobalDataProvider>
+              <SessionBridge />
+              <ExternalCountsBridge />
+              <EmailNotificationHandler />
+              <AppContent />
+            </GlobalDataProvider>
+          </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </EnhancedErrorBoundary>

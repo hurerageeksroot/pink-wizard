@@ -88,6 +88,30 @@ export const DailyTasks: React.FC<DailyTasksProps> = ({ isChallengeParticipant }
   });
   
   const { reconcileOutreach, logOutreachActivity, loading: syncLoading } = useOutreachReconciliation();
+  const [userProgress, setUserProgress] = useState<{ totalDaysCompleted: number; currentStreak: number } | null>(null);
+
+  // Load user's challenge progress
+  useEffect(() => {
+    const fetchUserProgress = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('user_challenge_progress')
+        .select('total_days_completed, current_streak')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single();
+      
+      if (data && !error) {
+        setUserProgress({
+          totalDaysCompleted: data.total_days_completed || 0,
+          currentStreak: data.current_streak || 0,
+        });
+      }
+    };
+    
+    fetchUserProgress();
+  }, [user]);
   const { toast } = useToast();
 
   // Load tasks when day changes
@@ -369,27 +393,52 @@ export const DailyTasks: React.FC<DailyTasksProps> = ({ isChallengeParticipant }
                   title={`Day ${selectedDay} Progress`}
                 />
 
-                {/* Challenge Day Selection */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <Select
-                      value={selectedDay.toString()}
-                      onValueChange={(value) => setSelectedDay(parseInt(value))}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: totalDays }, (_, i) => i + 1).map((day) => (
-                          <SelectItem key={day} value={day.toString()}>
-                            Day {day}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span className="text-sm text-muted-foreground">
-                      Current: Day {currentDay}
-                    </span>
+                {/* Challenge Day Selection with Progress Indicator */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <Select
+                        value={selectedDay.toString()}
+                        onValueChange={(value) => setSelectedDay(parseInt(value))}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: totalDays }, (_, i) => i + 1).map((day) => (
+                            <SelectItem key={day} value={day.toString()}>
+                              Day {day}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {/* Progress Status */}
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground">Challenge Day:</span>
+                      <span className="font-semibold text-primary">{currentDay}</span>
+                    </div>
+                    {userProgress && (
+                      <>
+                        <span className="text-muted-foreground">|</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-muted-foreground">Completed:</span>
+                          <span className="font-semibold text-secondary">{userProgress.totalDaysCompleted}</span>
+                        </div>
+                        {userProgress.totalDaysCompleted < currentDay && (
+                          <>
+                            <span className="text-muted-foreground">|</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Behind:</span>
+                              <span className="font-semibold text-destructive">{currentDay - userProgress.totalDaysCompleted}</span>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
 

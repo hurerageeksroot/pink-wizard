@@ -3,10 +3,10 @@ project_id = "idwkrddbdyakmpshsvtd"
 [auth]
 enabled = true
 
-[functions.seed-sample-data]
+[functions.generate-prospects]
 verify_jwt = true
 
-[functions.start-trial]
+[functions.seed-sample-data]
 verify_jwt = true
 
 [functions.check-access]
@@ -35,3 +35,33 @@ verify_jwt = false
 
 [functions.integrations-outbound]
 verify_jwt = false
+
+[functions.admin-complete-daily-task]
+verify_jwt = true
+
+[functions.admin-complete-weekly-task]
+verify_jwt = true
+
+[functions.backfill-activity-points]
+verify_jwt = true
+
+[functions.backfill-revenue-activities]
+verify_jwt = true
+
+[functions.join-waitlist]
+verify_jwt = false
+
+[functions.approve-waitlist-user]
+verify_jwt = true
+
+[functions.import-backup-data]
+verify_jwt = true
+
+[functions.update-challenge-progress]
+verify_jwt = false
+
+[functions.admin-send-password-reset]
+verify_jwt = true
+
+[functions.fix-relationship-intent-mismatches]
+verify_jwt = true

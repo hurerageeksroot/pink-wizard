@@ -1,0 +1,104 @@
+@use "@/styles/mixins.scss" as *;
+
+.app-navbar {
+  @include flexAlign();
+  height: 70px;
+  padding: 0 30px;
+  background-color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--borderLight);
+
+  .ac-navs {
+    flex: 1;
+    @include setToCenter();
+    gap: 30px;
+
+    .ac-nav-item {
+      color: var(--textLight);
+      font-size: 15px;
+      font-weight: 400;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      &:hover {
+        color: var(--mainNav);
+        font-weight: 500;
+      }
+      &.active {
+        color: var(--mainNav);
+        font-weight: 500;
+      }
+    }
+  }
+}
+
+.search-container {
+  @include flexAlign();
+  height: 40px;
+  gap: 5px;
+  min-width: 170px;
+  border: 1px solid var(--borderLight);
+  padding: 0 10px;
+  border-radius: 5px;
+
+  .sc-icon {
+    color: var(--iconColor);
+  }
+
+  .sc-input {
+    flex: 1;
+    font-size: 14px;
+    border: none;
+    outline: none;
+    padding: 0 5px;
+  }
+}
+
+.an-profile {
+  @include flexAlign();
+  gap: 10px;
+  background-color: var(--primaryColor);
+  padding: 7px 7px;
+  border-radius: 7px;
+  cursor: pointer;
+
+  .an-profile-image-container {
+    position: relative;
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      @include box(13px);
+      background-color: var(--successColor);
+      border: 2px solid #fff;
+      border-radius: 5px;
+    }
+  }
+
+  .profile-image {
+    @include box(35px);
+  }
+
+  .an-profile-info {
+    .an-profile-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+    .an-profile-email {
+      font-size: 10px;
+      font-weight: 400;
+      color: #fff;
+      line-height: 1;
+    }
+  }
+
+  .an-profile-icon {
+    margin-right: 5px;
+    color: #fff;
+  }
+}

@@ -32,9 +32,9 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     
-    if (userError || !user) {
+    if (authError || !user) {
       return new Response(JSON.stringify({
         success: false,
         error: "User not authenticated"
@@ -72,20 +72,21 @@ serve(async (req) => {
 
     console.log(`[fix-challenge-user-data] Processing fix for email: ${email}`);
 
-    // Find user by email
-    const { data: userData, error: userError } = await supabaseClient.auth.admin.getUserByEmail(email);
+    // Find user by email using listUsers
+    const { data: { users }, error: listError } = await supabaseClient.auth.admin.listUsers();
+    const targetUser = users?.find(u => u.email === email);
     
-    if (userError || !userData.user) {
+    if (listError || !targetUser) {
       return new Response(JSON.stringify({
         success: false,
-        error: "User not found"
+        error: `User not found with email: ${email}`
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 404,
+        headers: corsHeaders
       });
     }
 
-    const userId = userData.user.id;
+    const userId = targetUser.id;
     console.log(`[fix-challenge-user-data] Found user ID: ${userId}`);
 
     // 1. Cancel any active trials

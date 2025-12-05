@@ -59,144 +59,31 @@ serve(async (req) => {
     }
 
     const user = userData.user;
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    logStep("User authenticated - granting universal access", { userId: user.id, email: user.email });
 
-    // Check if user has valid access using the database function - this should handle challenge participants
-    const { data: accessData, error: accessError } = await supabaseClient
-      .rpc('user_can_write_secure', { user_id_param: user.id });
-
-    if (accessError) {
-      logStep("Error checking access", { error: accessError.message });
-      // In case of database error, deny access for security
-      return new Response(JSON.stringify({
-        hasAccess: false,
-        reason: "Access verification failed",
-        error: accessError.message,
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
-    }
-
-    const hasValidAccess = accessData === true;
+    // UNIVERSAL ACCESS MODE: All authenticated users have full write access
+    // This is simplified for early-stage application with 45 users
+    // No payment/subscription/trial checks needed
     
-    // Always check challenge participation explicitly for better messaging
-    const { data: challengeParticipant, error: challengeError } = await supabaseClient
+    // Optional: Check challenge participation for informational purposes only
+    const { data: challengeParticipant } = await supabaseClient
       .rpc('user_is_challenge_participant', { user_id_param: user.id });
-    
-    logStep("Access and challenge check completed", { 
-      hasAccess: hasValidAccess,
-      isChallengeParticipant: challengeParticipant, 
-      challengeError: challengeError?.message 
+
+    logStep("Access granted to authenticated user", { 
+      userId: user.id,
+      isChallengeParticipant: challengeParticipant === true
     });
 
-    // Get detailed status information for better messaging
-    let accessDetails = {
-      hasSubscription: false,
-      hasPayment: false,
-      hasTrial: false,
-      isChallengeParticipant: challengeParticipant === true, // Always use DB function result
-      trialEndDate: null,
-      challengeEndDate: null
-    };
-
-    let subscriptionTier = null;
-
-    if (hasValidAccess) {
-      // Check what type of access user has for better messaging with error handling
-      try {
-        const subscriptionResult = await supabaseClient.from('subscribers').select('subscribed, subscription_tier, subscription_end').eq('user_id', user.id).eq('subscribed', true).maybeSingle();
-        const paymentResult = await supabaseClient.from('payments').select('access_expires_at').eq('user_id', user.id).in('status', ['paid', 'demo']).gte('access_expires_at', new Date().toISOString()).maybeSingle();
-        const trialResult = await supabaseClient.rpc('user_has_active_trial', { user_id_param: user.id });
-        const challengeProgressResult = await supabaseClient.from('user_challenge_progress').select('is_active').eq('user_id', user.id).eq('is_active', true).maybeSingle();
-        
-        const subscriptionCheck = subscriptionResult.error ? { data: null } : subscriptionResult;
-        const paymentCheck = paymentResult.error ? { data: null } : paymentResult;
-        const trialCheck = trialResult.error ? { data: false } : trialResult;
-        const challengeProgressCheck = challengeProgressResult.error ? { data: null } : challengeProgressResult;
-
-        // Check if challenge is currently active
-        const challengeConfigResult = await supabaseClient
-          .from('challenge_config')
-          .select('start_date, end_date')
-          .eq('is_active', true)
-          .maybeSingle();
-
-        const challengeConfig = challengeConfigResult.error ? null : challengeConfigResult.data;
-
-        const challengeActive = challengeConfig && 
-          new Date() >= new Date(challengeConfig.start_date) && 
-          new Date() <= new Date(challengeConfig.end_date);
-
-        accessDetails.hasSubscription = !!subscriptionCheck.data;
-        accessDetails.hasPayment = !!paymentCheck.data;
-        accessDetails.hasTrial = trialCheck.data === true;
-        // Use the dedicated database function for challenge participation
-        accessDetails.isChallengeParticipant = challengeParticipant === true;
-
-        // Store subscription tier for response
-        subscriptionTier = subscriptionCheck.data?.subscription_tier || null;
-
-        // Get trial end date if has trial
-        if (accessDetails.hasTrial) {
-          try {
-            const { data: trialData } = await supabaseClient
-              .from('user_trials')
-              .select('trial_end_at')
-              .eq('user_id', user.id)
-              .eq('status', 'active')
-              .maybeSingle();
-            accessDetails.trialEndDate = trialData?.trial_end_at;
-          } catch (error) {
-            logStep("Error fetching trial end date", { error: error.message });
-          }
-        }
-
-        // Get challenge end date if participant
-        if (accessDetails.isChallengeParticipant && challengeConfig) {
-          accessDetails.challengeEndDate = challengeConfig.end_date;
-        }
-      } catch (error) {
-        logStep("Error fetching access details", { error: error.message });
-        // Continue with default values
-      }
-
-      // Determine primary reason for access
-      let reason = "Access granted";
-      if (accessDetails.hasSubscription) {
-        reason = "Active subscription";
-      } else if (accessDetails.hasPayment) {
-        reason = "Valid payment";
-      } else if (accessDetails.hasTrial) {
-        reason = "Active 14-day free trial";
-      } else if (accessDetails.isChallengeParticipant) {
-        reason = "Challenge participant";
-      }
-
-      return new Response(JSON.stringify({
-        hasAccess: true,
-        reason,
-        ...accessDetails,
-        subscription_tier: subscriptionTier,
-        user: {
-          id: user.id,
-          email: user.email
-        },
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    // No valid access found
-    logStep("Access denied - no valid payment, subscription, trial, or challenge participation");
     return new Response(JSON.stringify({
-      hasAccess: false,
-      reason: "No active subscription, payment, trial, or challenge participation",
-      requiresPayment: true,
-      ...accessDetails,
+      hasAccess: true,
+      reason: "Authenticated user",
+      hasSubscription: false, // Not checking subscriptions
+      hasPayment: false, // Not checking payments
+      hasTrial: false, // Not checking trials
+      isChallengeParticipant: challengeParticipant === true,
+      trialEndDate: null,
+      challengeEndDate: null,
+      subscription_tier: null,
       user: {
         id: user.id,
         email: user.email
@@ -204,17 +91,17 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 403,
+      status: 200,
     });
 
   } catch (error) {
-    logStep("Unexpected error", { error: error.message });
+    logStep("Unexpected error", { error: error instanceof Error ? error.message : 'Unknown error' });
     
     // In case of unexpected error, deny access for security
     return new Response(JSON.stringify({ 
       hasAccess: false,
       reason: "Access verification system error",
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

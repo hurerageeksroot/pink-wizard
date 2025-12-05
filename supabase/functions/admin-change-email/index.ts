@@ -127,7 +127,10 @@ serve(async (req) => {
     if (checkError) {
       console.error('Error checking existing email:', checkError)
       return new Response(
-        JSON.stringify({ error: 'Failed to validate email availability' }),
+        JSON.stringify({ 
+          error: 'An error occurred processing your request',
+          code: 'OPERATION_FAILED'
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -141,7 +144,10 @@ serve(async (req) => {
     if (authCheckError) {
       console.error('Error checking auth users:', authCheckError)
       return new Response(
-        JSON.stringify({ error: 'Failed to validate email in auth system' }),
+        JSON.stringify({ 
+          error: 'An error occurred processing your request',
+          code: 'OPERATION_FAILED'
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -195,7 +201,10 @@ serve(async (req) => {
     if (updateError) {
       console.error('Error updating user email:', updateError)
       return new Response(
-        JSON.stringify({ error: 'Failed to update email address' }),
+        JSON.stringify({ 
+          error: 'An error occurred processing your request',
+          code: 'OPERATION_FAILED'
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

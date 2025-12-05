@@ -348,7 +348,7 @@ Deno.serve(async (req) => {
 
           // Update task completions based on outreach type requirements
           for (const taskDef of taskDefinitions) {
-            if (taskDef.outreach_type && outreachCounts[taskDef.outreach_type] >= taskDef.count_required) {
+            if (taskDef.outreach_type && outreachCounts[taskDef.outreach_type as keyof typeof outreachCounts] >= taskDef.count_required) {
               const { error: updateError } = await supabase
                 .from('user_daily_tasks')
                 .update({ completed: true, completed_at: new Date().toISOString() })
@@ -415,9 +415,9 @@ Deno.serve(async (req) => {
           bonusesAwarded: 0,
           eligibleNotEnrolled: 0,
           enrolledByAudit: 0,
-          errors: [`Unexpected error: ${error.message}`]
+          errors: [`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`]
         },
-        errors: [`Unexpected error: ${error.message}`],
+        errors: [`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`],
         dryRun: true
       }),
       { status: 200, headers: { ...corsHeaders, 'content-type': 'application/json' } }

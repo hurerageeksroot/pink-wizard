@@ -1,5 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAdminData } from '@/hooks/useAdminData';
+import ManualTaskCompletion from '@/components/Admin/ManualTaskCompletion';
+import { BackfillRevenueActivities } from '@/components/Admin/BackfillRevenueActivities';
 import { 
   Users, 
   FileText, 
@@ -119,7 +121,11 @@ export function AdminDashboard() {
         })}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <ManualTaskCompletion />
+        
+        <BackfillRevenueActivities />
+        
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>

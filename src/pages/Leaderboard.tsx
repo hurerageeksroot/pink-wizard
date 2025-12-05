@@ -35,7 +35,7 @@ const getRankBadgeVariant = (position: number) => {
 
 export default function Leaderboard() {
   const { user } = useAuth();
-  const { isChallengeParticipant } = useChallenge();
+  const { isChallengeParticipant, isActive } = useChallenge();
   const { leaderboard, pointsLeaderboard, revenueLeaderboard, loading, refreshLeaderboard } = useLeaderboard();
   const { isAdmin } = useChallengeAdmin();
   const { status: challengeStatus } = useChallengeStatus();
@@ -118,7 +118,15 @@ export default function Leaderboard() {
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Challenge Leaderboard</h1>
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+            {!isActive && <Trophy className="h-8 w-8 text-yellow-500" />}
+            {isActive ? 'Challenge Leaderboard' : 'Final Challenge Standings'}
+          </h1>
+          {!isActive && (
+            <p className="text-sm text-muted-foreground">
+              75 Hard Mobile Bar Challenge - September 8 to November 22, 2025
+            </p>
+          )}
         </div>
         <Button 
           onClick={handleRefresh} 

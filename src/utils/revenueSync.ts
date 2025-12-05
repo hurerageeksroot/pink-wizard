@@ -104,7 +104,12 @@ export function sendRevenueEventToParent(event: RevenueLoggedEvent | ContactWonE
 export async function getContactLifetimeValue(contactId: string): Promise<number> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return 0;
+    if (!user) {
+      console.log('[getContactLifetimeValue] No authenticated user');
+      return 0;
+    }
+
+    console.log('[getContactLifetimeValue] Fetching revenue for contact:', contactId, 'user:', user.id);
 
     const { data: metrics, error } = await supabase
       .from('user_metrics')
@@ -114,13 +119,16 @@ export async function getContactLifetimeValue(contactId: string): Promise<number
       .eq('contact_id', contactId);
 
     if (error) {
-      console.error('Error fetching contact lifetime value:', error);
+      console.error('[getContactLifetimeValue] Error fetching contact lifetime value:', error);
       return 0;
     }
 
-    return metrics?.reduce((sum, metric) => sum + metric.value, 0) || 0;
+    const total = metrics?.reduce((sum, metric) => sum + metric.value, 0) || 0;
+    console.log('[getContactLifetimeValue] Found', metrics?.length || 0, 'revenue entries totaling:', total);
+    
+    return total;
   } catch (error) {
-    console.error('Error calculating contact lifetime value:', error);
+    console.error('[getContactLifetimeValue] Error calculating contact lifetime value:', error);
     return 0;
   }
 }

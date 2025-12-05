@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 export const EmailNotificationHandler = () => {
   const { user } = useAuth();
   const { sendRewardNotification, sendAdminNotification } = useEmailNotifications();
-  const { triggerChallengeStart, triggerChallengeComplete, triggerTrialEnding } = useEmailSequenceTriggers();
+  const { triggerChallengeStart, triggerChallengeComplete } = useEmailSequenceTriggers();
   
   // Initialize follow-up reminders (automatically checks and sends follow-up emails)
   useFollowUpReminders(user);
@@ -116,12 +116,6 @@ export const EmailNotificationHandler = () => {
 
     // Touchpoint gamification is now handled by database triggers - no need for event handling
 
-    // Handle trial ending events
-    const handleTrialEnding = (event: CustomEvent) => {
-      const { userId, daysLeft } = event.detail;
-      triggerTrialEnding(userId || user.id, daysLeft || 3);
-    };
-
     // Set up event listeners
     window.addEventListener('badgeEarned', handleBadgeEarned as EventListener);
     window.addEventListener('contactMilestone', handleContactMilestone as EventListener);
@@ -129,7 +123,6 @@ export const EmailNotificationHandler = () => {
     window.addEventListener('challengeStarted', handleChallengeStart as EventListener);
     window.addEventListener('challengeCompleted', handleChallengeComplete as EventListener);
     // touchpointLogged event listener removed - handled by database triggers
-    window.addEventListener('trialEnding', handleTrialEnding as EventListener);
 
     return () => {
       window.removeEventListener('badgeEarned', handleBadgeEarned as EventListener);
@@ -138,9 +131,8 @@ export const EmailNotificationHandler = () => {
       window.removeEventListener('challengeStarted', handleChallengeStart as EventListener);
       window.removeEventListener('challengeCompleted', handleChallengeComplete as EventListener);
       // touchpointLogged event listener removed - handled by database triggers
-      window.removeEventListener('trialEnding', handleTrialEnding as EventListener);
     };
-  }, [user, sendRewardNotification, sendAdminNotification, triggerChallengeStart, triggerChallengeComplete, triggerTrialEnding]);
+  }, [user, sendRewardNotification, sendAdminNotification, triggerChallengeStart, triggerChallengeComplete]);
 
   return null; // This is a logic-only component
 };

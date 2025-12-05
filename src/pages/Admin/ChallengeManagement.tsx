@@ -538,6 +538,7 @@ const ChallengeManagement = () => {
 };
 
 const ChallengeEditor = ({ challenge, onSave }: { challenge: ChallengeConfig | null, onSave: (data: Partial<ChallengeConfig>) => void }) => {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: challenge?.name || '',
     start_date: challenge?.start_date || '',
@@ -550,10 +551,14 @@ const ChallengeEditor = ({ challenge, onSave }: { challenge: ChallengeConfig | n
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Challenge Configuration</CardTitle>
-        <CardDescription>
-          Manage the main challenge settings and timeline
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Challenge Configuration</CardTitle>
+            <CardDescription>
+              Manage the main challenge settings and timeline
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2">

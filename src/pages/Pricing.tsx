@@ -12,18 +12,21 @@ import { useNavigate } from "react-router-dom";
 const basePlan = {
   name: "Professional Plan",
   icon: Crown,
-  description: "Contact management system with outreach tracking - 0 AI tokens included",
+  description: "Everything you need to cultivate your network—0 AI tokens included",
   monthlyPrice: 9,
   yearlyPrice: 90, // 2 months free
   features: [
-    "Contact management & organization",
-    "Task management & tracking", 
-    "Outreach tracking & analytics",
-    "Revenue & deal tracking",
+    "Unlimited contacts—track your entire network",
+    "Relationship-first organization (past clients, referral partners, strategic allies)",
+    "Smart follow-up cadences that match each relationship type",
+    "Activity tracking across all channels",
+    "Revenue & referral tracking—see your network ROI",
+    "Daily prioritization—know who to reach out to and why",
+    "Streak tracking & motivation",
     "Community access",
     "Email support",
     "Free trial available",
-    "0 AI tokens included",
+    "0 AI tokens included (purchase separately)",
   ],
   buttonText: "Get Started",
   buttonVariant: "default" as const,
@@ -33,14 +36,14 @@ const tokenPacks = [
   {
     name: "Starter Pack",
     icon: Zap,
-    description: "Perfect for getting started",
+    description: "Perfect for re-engaging past clients",
     tokens: "50K",
     price: 9.99,
     features: [
       "50,000 AI tokens",
       "~33 outreach messages",
       "365-day carryover",
-      "Generate outreach messages",
+      "Re-engage past clients who've gone quiet",
     ],
     popular: false,
     buttonText: "Buy Tokens",
@@ -52,14 +55,15 @@ const tokenPacks = [
   {
     name: "Growth Pack",
     icon: Rocket,
-    description: "Best value for active networkers",
+    description: "Best value for active network builders",
     tokens: "300K",
     price: 49.99,
     features: [
       "300,000 AI tokens",
       "~200 outreach messages",
       "365-day carryover",
-      "Generate outreach messages",
+      "Nurture referral partners at scale",
+      "Personalize donor communications (nonprofits)",
     ],
     popular: true,
     buttonText: "Buy Tokens",
@@ -71,14 +75,14 @@ const tokenPacks = [
   {
     name: "Enterprise Pack",
     icon: Crown,
-    description: "For high-volume outreach",
+    description: "For comprehensive network cultivation",
     tokens: "1.5M",
     price: 199.99,
     features: [
       "1,500,000 AI tokens",
       "~1,000 outreach messages",
       "365-day carryover",
-      "Generate outreach messages",
+      "Strategic partnership proposals at scale",
       "Team member invites (coming soon)",
     ],
     popular: false,
@@ -129,10 +133,10 @@ export default function Pricing() {
             Simple Pricing
           </Badge>
           <h1 className="text-4xl font-bold tracking-tight mb-4">
-            One simple base plan. Add AI tokens when you need message help.
+            Simple Pricing for <em>Relationship-Led Growth</em>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Start small, scale outreach as you grow—no bloated bundles or confusing tiers.
+            Invest in your network, not bloated software. One base plan for relationship cultivation, plus AI tokens when you need message help.
           </p>
           <div className="mt-6">
             <Button variant="link" onClick={() => navigate("/features")} className="text-primary">
@@ -221,7 +225,7 @@ export default function Pricing() {
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold mb-2">AI Token Packs</h2>
             <p className="text-muted-foreground">
-              Purchase AI credits for personalized outreach campaigns as you need them
+              Add AI assistance for <em>personalized</em> outreach at scale—break through the "I don't know what to say" barrier
             </p>
           </div>
           
@@ -299,21 +303,33 @@ export default function Pricing() {
           <h2 className="text-2xl font-bold mb-8">Frequently Asked Questions</h2>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
             <div>
+              <h3 className="font-semibold mb-2">Is this just for sales?</h3>
+              <p className="text-muted-foreground text-sm">
+                No! PinkWizard is for anyone whose success depends on relationships: consultants, nonprofits, community organizers, event pros, small businesses, personal brands, and more.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">I already have a CRM. Why do I need this?</h3>
+              <p className="text-muted-foreground text-sm">
+                Traditional CRMs manage inbound leads. PinkWizard helps you intentionally cultivate your network—past clients, referral partners, strategic allies, and future opportunities. Different tool, different purpose.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">How is this different from LinkedIn?</h3>
+              <p className="text-muted-foreground text-sm">
+                LinkedIn is a directory. PinkWizard is a system. It tells you who to reach out to, when, and why—and helps you track which relationships actually drive business outcomes.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Can nonprofits use this for donor management?</h3>
+              <p className="text-muted-foreground text-sm">
+                Absolutely! Many of our users are nonprofit professionals who use PinkWizard to track donor cultivation (not just donation asks), volunteer relationships, and community partnerships.
+              </p>
+            </div>
+            <div>
               <h3 className="font-semibold mb-2">How do AI tokens work?</h3>
               <p className="text-muted-foreground text-sm">
                 Each AI outreach message uses approximately 1,500 tokens. All token packs have 365-day carryover.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Can I cancel my subscription anytime?</h3>
-              <p className="text-muted-foreground text-sm">
-                Yes! You can cancel anytime. You'll keep access until the end of your billing period.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Do unused tokens rollover?</h3>
-              <p className="text-muted-foreground text-sm">
-                Yes, all token packs have 365-day validity and unused tokens rollover.
               </p>
             </div>
             <div>
@@ -327,9 +343,9 @@ export default function Pricing() {
 
         {/* CTA Section */}
         <div className="mt-16 text-center bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-8 border border-primary/20">
-          <h2 className="text-2xl font-bold mb-4">Ready to transform your networking?</h2>
+          <h2 className="text-2xl font-bold mb-4">Your Network is Your Biggest Asset. <em>Start Investing in It Today.</em></h2>
           <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-            Start with just $9/month and scale your AI outreach as your business grows.
+            For $9/month, get the system that helps you turn contacts into relationships, and relationships into compounding opportunities.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" onClick={() => navigate(user ? "/" : "/auth")} className="bg-primary">
